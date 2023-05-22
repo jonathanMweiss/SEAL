@@ -3,28 +3,31 @@
 
 # Source files in this directory
 set(SEAL_SOURCE_FILES ${SEAL_SOURCE_FILES}
-    ${CMAKE_CURRENT_LIST_DIR}/batchencoder.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ciphertext.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/ckks.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/context.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/decryptor.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/encryptionparams.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/encryptor.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/evaluator.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/keygenerator.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/kswitchkeys.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/memorymanager.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/modulus.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/plaintext.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/randomgen.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/serialization.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/valcheck.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/fractured_poly.cpp
-)
+        ${CMAKE_CURRENT_LIST_DIR}/batchencoder.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/ciphertext.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/ckks.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/context.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/decryptor.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/encryptionparams.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/encryptor.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/evaluator.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/keygenerator.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/kswitchkeys.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/memorymanager.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/modulus.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/plaintext.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/randomgen.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/serialization.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/valcheck.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/fractured_poly.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/rns_fracture.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/fractured_polynomial.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/fractured_ciphertext.cpp
+        )
 
 # Add header files for installation
 install(
-    FILES
+        FILES
         ${CMAKE_CURRENT_LIST_DIR}/batchencoder.h
         ${CMAKE_CURRENT_LIST_DIR}/ciphertext.h
         ${CMAKE_CURRENT_LIST_DIR}/ckks.h
@@ -52,7 +55,10 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/version.h
         ${CMAKE_CURRENT_LIST_DIR}/fractured_poly.h
         ${CMAKE_CURRENT_LIST_DIR}/matrix.h
-    DESTINATION
+        ${CMAKE_CURRENT_LIST_DIR}/rns_fracture.h
+        ${CMAKE_CURRENT_LIST_DIR}/fractured_polynomial.h
+        ${CMAKE_CURRENT_LIST_DIR}/fractured_ciphertext.h
+        DESTINATION
         ${SEAL_INCLUDES_INSTALL_DIR}/seal
 )
 
