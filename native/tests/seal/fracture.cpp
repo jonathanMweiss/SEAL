@@ -26,6 +26,11 @@ namespace sealtest
         seal::SEALContext context;
         seal::fractures::Essence essence;
         seal::Evaluator evaluator;
+        seal::KeyGenerator keygen;
+        seal::SecretKey secret_key;
+        seal::Encryptor encryptor;
+        seal::Decryptor decryptor;
+
         static SetupObjs New(std::uint64_t N = 4096, int logt = 20)
         {
             seal::EncryptionParameters enc(seal::scheme_type::bgv);
@@ -39,18 +44,17 @@ namespace sealtest
 
         explicit SetupObjs(seal::EncryptionParameters encryption_params)
             : enc_params(std::move(encryption_params)), context(enc_params, true), essence(context, enc_params),
-              evaluator(context)
-        {}
+              evaluator(context), keygen(context), secret_key(keygen.secret_key()), encryptor(context, secret_key),
+              decryptor(context, secret_key){};
     };
 
-    TEST(FracturedOps, Poly)
+    TEST(FracturedOps, MultiplyAndReconstructSingleShard)
     {
         auto all = SetupObjs::New();
 
         // test
-        seal::Plaintext ptx("1x^2 + 2x^1 + 3x^0");
-        seal::fractures::Poly::crate_plaintext(all.evaluator, all.essence, 2, ptx);
+        seal::Plaintext ptx1("1x^2 + 2x^1 + 3x^0");
+        auto frac_poly = seal::fractures::Poly::from_plaintext(all.evaluator, all.essence, 2, ptx1);
 
-        std::cout << "hello friend" << std::endl;
     }
 } // namespace sealtest
