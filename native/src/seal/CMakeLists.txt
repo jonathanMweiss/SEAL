@@ -19,6 +19,7 @@ set(SEAL_SOURCE_FILES ${SEAL_SOURCE_FILES}
     ${CMAKE_CURRENT_LIST_DIR}/randomgen.cpp
     ${CMAKE_CURRENT_LIST_DIR}/serialization.cpp
     ${CMAKE_CURRENT_LIST_DIR}/valcheck.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/fractured_poly.cpp
 )
 
 # Add header files for installation
@@ -49,6 +50,8 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/serialization.h
         ${CMAKE_CURRENT_LIST_DIR}/valcheck.h
         ${CMAKE_CURRENT_LIST_DIR}/version.h
+        ${CMAKE_CURRENT_LIST_DIR}/fractured_poly.h
+        ${CMAKE_CURRENT_LIST_DIR}/matrix.h
     DESTINATION
         ${SEAL_INCLUDES_INSTALL_DIR}/seal
 )
