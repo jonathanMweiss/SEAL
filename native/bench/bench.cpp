@@ -91,7 +91,9 @@ namespace sealbench
         }
 
         SEAL_BENCHMARK_REGISTER(BGV, n, log_q, EncryptSecret, bm_bgv_encrypt_secret, bm_env_bgv);
-        SEAL_BENCHMARK_REGISTER(BGV, n, log_q, PolynomialFracture, polynomial_fracture, bm_env_bfv);
+        SEAL_BENCHMARK_REGISTER(BGV, n, log_q, PolynomialFracture, polynomial_fracture, bm_env_bgv);
+        SEAL_BENCHMARK_REGISTER(BGV, n, log_q, CiphertextFracture, fracture_ctx, bm_env_bgv);
+        SEAL_BENCHMARK_REGISTER(BGV, n, log_q, FracturedMulPt, fractured_plain_mult, bm_env_bgv);
         SEAL_BENCHMARK_REGISTER(BGV, n, log_q, EncryptPublic, bm_bgv_encrypt_public, bm_env_bgv);
         SEAL_BENCHMARK_REGISTER(BGV, n, log_q, Decrypt, bm_bgv_decrypt, bm_env_bgv);
         SEAL_BENCHMARK_REGISTER(BGV, n, log_q, EncodeBatch, bm_bgv_encode_batch, bm_env_bgv);
