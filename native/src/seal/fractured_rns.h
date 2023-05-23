@@ -12,13 +12,14 @@ namespace seal::fractures
     // Represents the key parameters to fracture a polynomial.
     struct Essence
     {
+    public:
         //            const seal::SEALContext::ContextData context_data;
         seal::EncryptionParameters parms;
         std::vector<seal::Modulus> coeff_modulus;
         std::uint64_t coeff_count;
         std::uint64_t coeff_modulus_size;
 
-        explicit Essence(const seal::SEALContext &context_data, seal::EncryptionParameters params)
+        explicit Essence(const seal::SEALContext &_, seal::EncryptionParameters params)
             : parms(std::move(params)), coeff_modulus(parms.coeff_modulus()), coeff_count(parms.poly_modulus_degree()),
               coeff_modulus_size(coeff_modulus.size()){};
     };

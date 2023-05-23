@@ -3,8 +3,8 @@
 #include "seal/evaluator.h"
 #include "seal/plaintext.h"
 #include <utility>
+#include "fractured_rns.h"
 #include "matrix.h"
-#include "rns_fracture.h"
 
 namespace seal::fractures
 {

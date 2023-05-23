@@ -348,6 +348,9 @@ namespace sealbench
         std::vector<seal::Ciphertext> ct_;
     }; // namespace BMEnv
 
+    // fractures
+    void polynomial_fracture(benchmark::State &state, std::shared_ptr<BMEnv> bm_env);
+
     // NTT benchmark cases
     void bm_util_ntt_forward(benchmark::State &state, std::shared_ptr<BMEnv> bm_env);
     void bm_util_ntt_inverse(benchmark::State &state, std::shared_ptr<BMEnv> bm_env);

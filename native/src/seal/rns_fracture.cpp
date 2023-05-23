@@ -1,6 +1,6 @@
 
 
-#include "rns_fracture.h"
+#include "fractured_rns.h"
 
 // i have coef count/ num fractures
 // i have num-cols as the
