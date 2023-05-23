@@ -3,28 +3,22 @@
 namespace seal::fractures
 {
 
-    CiphertextShredder::CiphertextShredder(
-        seal::Ciphertext &ctx, std::uint64_t modulus_size, std::uint64_t num_coefficients,
-        const std::vector<seal::Modulus> &coeff_modulus, std::uint64_t num_fractures) noexcept
+    CiphertextShredder::CiphertextShredder(seal::Ciphertext &ctx, Essence e, std::uint64_t num_fractures) noexcept
         : num_coefficients(num_coefficients)
     {
-        std::vector<PolynomialShredder> poly_shredders;
+        std::vector<Polynomial> poly_shredders;
         poly_shredders.reserve(ctx.size());
         // TODO: create a copy once, and give it the positions it can use.
         std::for_each_n(seal::util::PolyIter(ctx), ctx.size(), [&](seal::util::RNSIter rns_iter_per_poly) {
-            poly_shredders.emplace_back(
-                PolynomialShredder(rns_iter_per_poly, modulus_size, num_coefficients, num_fractures));
+            poly_shredders.emplace_back(rns_iter_per_poly, e, num_fractures);
         });
 
         ctx_parts.reserve(num_fractures);
 
         for (std::uint64_t i = 0; i < num_fractures; ++i)
         {
-            CiphertextFracture fracture{
-                .poly_fracs = {},
-                .index = i,
-                .coeff_modulus = coeff_modulus,
-            };
+            CiphertextFracture fracture{ {}, i, e.coeff_modulus };
+
             fracture.poly_fracs.reserve(ctx.size());
 
             for (std::uint64_t j = 0; j < ctx.size(); ++j)

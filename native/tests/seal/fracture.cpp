@@ -91,11 +91,8 @@ namespace sealtest
         seal::Ciphertext encrypted_ntt_cpy(encrypted_ntt);
         seal::Plaintext ptx_cpy(ptx);
 
-        seal::fractures::CiphertextShredder cshredder(
-            encrypted_ntt_cpy, all.essence.coeff_modulus_size, all.essence.coeff_count, all.essence.coeff_modulus,
-            num_fractures);
-        seal::fractures::PolynomialShredder pshredder(
-            ptx_cpy, all.essence.coeff_modulus_size, all.essence.coeff_count, num_fractures);
+        seal::fractures::CiphertextShredder cshredder(encrypted_ntt_cpy, all.essence, num_fractures);
+        seal::fractures::Polynomial pshredder(ptx_cpy, all.essence, num_fractures);
 
         // perform fractured multiplication:
         for (int i = 0; i < num_fractures; ++i)
