@@ -37,18 +37,13 @@ namespace seal::fractures
      * these polynomials are used to perform multiplication between a ciphertext and a plaintext in a distributed
      * manner.
      */
-    class PolynomialShredder
+    class Polynomial
     {
     public:
-        explicit PolynomialShredder(
-            const seal::util::ConstRNSIter &p, std::uint64_t modulus_size, std::uint64_t num_coefficients,
-            std::uint64_t num_fractures) noexcept;
+        explicit Polynomial(const seal::util::ConstRNSIter &p, Essence e, std::uint64_t num_fractures) noexcept;
 
-        explicit PolynomialShredder(
-            seal::Plaintext &p, std::uint64_t modulus_size, std::uint64_t num_coefficients,
-            std::uint64_t num_fractures) noexcept
-            : PolynomialShredder(
-                  seal::util::ConstRNSIter(p.data(), num_coefficients), modulus_size, num_coefficients, num_fractures)
+        explicit Polynomial(seal::Plaintext &p, const Essence &e, std::uint64_t num_fractures) noexcept
+            : Polynomial(seal::util::ConstRNSIter(p.data(), e.coeff_count), e, num_fractures)
         {}
 
         const PolynomialFracture &get_fracture(std::uint64_t index);
@@ -59,5 +54,8 @@ namespace seal::fractures
             uint64_t num_fractures, uint64_t index);
 
         std::vector<PolynomialFracture> fractures;
+        matrix<std::uint64_t> poly_data;
+        std::uint64_t num_fractures;
+        const Essence essence;
     };
-} // namespace math
+} // namespace seal::fractures
