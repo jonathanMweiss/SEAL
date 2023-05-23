@@ -49,9 +49,10 @@ namespace sealbench
         shared_ptr<BMEnv> bm_env_ckks = bm_env_map.find(parms_ckks)->second;
 
         // Registration / display order:
+
         // 1. KeyGen
         // 2. BFV
-        // 3. BGV
+        // 3. BGV (includes Fractured)
         // 4. CKKS
         // 5. Util
         int n = static_cast<int>(parms.first);
@@ -90,6 +91,7 @@ namespace sealbench
         }
 
         SEAL_BENCHMARK_REGISTER(BGV, n, log_q, EncryptSecret, bm_bgv_encrypt_secret, bm_env_bgv);
+        SEAL_BENCHMARK_REGISTER(BGV, n, log_q, PolynomialFracture, polynomial_fracture, bm_env_bfv);
         SEAL_BENCHMARK_REGISTER(BGV, n, log_q, EncryptPublic, bm_bgv_encrypt_public, bm_env_bgv);
         SEAL_BENCHMARK_REGISTER(BGV, n, log_q, Decrypt, bm_bgv_decrypt, bm_env_bgv);
         SEAL_BENCHMARK_REGISTER(BGV, n, log_q, EncodeBatch, bm_bgv_encode_batch, bm_env_bgv);

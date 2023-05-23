@@ -56,6 +56,7 @@ if(SEAL_BUILD_BENCH)
     target_sources(sealbench
         PRIVATE
             ${CMAKE_CURRENT_LIST_DIR}/bench.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/fractures.cpp
             ${CMAKE_CURRENT_LIST_DIR}/keygen.cpp
             ${CMAKE_CURRENT_LIST_DIR}/ntt.cpp
             ${CMAKE_CURRENT_LIST_DIR}/bfv.cpp

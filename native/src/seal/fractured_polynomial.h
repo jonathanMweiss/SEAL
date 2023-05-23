@@ -3,8 +3,8 @@
 #include "seal/evaluator.h"
 #include "seal/plaintext.h"
 #include <utility>
+#include "fractured_rns.h"
 #include "matrix.h"
-#include "rns_fracture.h"
 
 namespace seal::fractures
 {
@@ -42,7 +42,7 @@ namespace seal::fractures
     public:
         explicit Polynomial(const seal::util::ConstRNSIter &p, Essence e, std::uint64_t num_fractures) noexcept;
 
-        explicit Polynomial(seal::Plaintext &p, const Essence &e, std::uint64_t num_fractures) noexcept
+        explicit Polynomial(const seal::Plaintext &p, const Essence &e, std::uint64_t num_fractures) noexcept
             : Polynomial(seal::util::ConstRNSIter(p.data(), e.coeff_count), e, num_fractures)
         {}
 
