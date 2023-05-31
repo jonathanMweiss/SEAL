@@ -1,7 +1,9 @@
 #######################
 #### SEAL Specific ####
 #######################
-
+.idea/
+cmake-build-debug
+tmp
 # Configuration
 !cmake/*.cmake.in
 !cmake/*.cmake
