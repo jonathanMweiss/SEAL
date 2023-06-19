@@ -11,6 +11,7 @@ cmake_minimum_required(VERSION 3.13)
 #   4. SEAL C++ tests                             #
 ###################################################
 
+add_compile_options(-Wall -Wextra -Werror -pedantic -g -fsanitize=address)
 # [option] CMAKE_BUILD_TYPE (default: "Release")
 # Build in one of the following modes: Release, Debug, MiniSizeRel, or RelWithDebInfo.
 # Most generators recognize these and can set the compiler flags accordingly. We set

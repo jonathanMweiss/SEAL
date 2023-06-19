@@ -8,18 +8,26 @@ namespace seal::fractures
 {
     struct CiphertextFracture
     {
+        static CiphertextFracture Empty(
+            std::uint64_t num_polys, std::uint64_t index, std::uint64_t num_coefs, std::vector<seal::Modulus> coef_mod);
+
+        static CiphertextFracture Empty(const CiphertextFracture &ctxf);
+
         std::vector<PolynomialFracture> poly_fracs;
         std::uint64_t index;
         std::vector<seal::Modulus> coeff_modulus;
 
         const CiphertextFracture &operator*=(const PolynomialFracture &poly);
+        const CiphertextFracture &operator+=(const CiphertextFracture &ctxf);
+        const CiphertextFracture &operator*=(const CiphertextFracture &y);
 
-        // changes self? no, creates a copy and resturns it.
-        CiphertextFracture operator*(const PolynomialFracture &poly)
-        {
-            CiphertextFracture res(*this);
-            return res *= poly;
-        }
+        // TODO: verify.
+        CiphertextFracture operator*(const PolynomialFracture &poly) const;
+        CiphertextFracture operator*(const CiphertextFracture &y) const;
+        CiphertextFracture operator+(const CiphertextFracture &ctxf);
+
+    private:
+        inline void add(const CiphertextFracture &ctxf, uint64_t i, uint64_t rns_num);
     };
 
     /**
@@ -30,9 +38,9 @@ namespace seal::fractures
     class CiphertextShredder
     {
     public:
-        explicit CiphertextShredder(seal::Ciphertext &ctx, Essence e, std::uint64_t num_fractures) noexcept;
+        CiphertextShredder(Essence e, std::uint64_t num_fractures) noexcept;
 
-        CiphertextFracture get_fracture(std::uint64_t index);
+        explicit CiphertextShredder(const seal::Ciphertext &ctx, Essence e, std::uint64_t num_fractures) noexcept;
 
         CiphertextFracture &operator[](std::uint64_t index)
         {
@@ -40,10 +48,14 @@ namespace seal::fractures
         }
 
         // todo: func that turns this shredder back to full ciphertext.
-        void into_ciphertext(seal::Ciphertext &ciphertext);
+        seal::Ciphertext into_ciphertext() const;
+
+        uint64_t num_fractures();
+
+        void set_fracture(uint64_t i, CiphertextFracture fracture);
 
     private:
-        std::uint64_t num_coefficients;
+        seal::fractures::Essence essence;
         std::vector<CiphertextFracture> ctx_parts;
     };
 } // namespace seal::fractures

@@ -1,4 +1,5 @@
 #include "fractured_polynomial.h"
+#include "fractured_ciphertext.h"
 
 namespace seal::fractures
 {
@@ -9,25 +10,26 @@ namespace seal::fractures
     {
         PolynomialFracture fracture(index, num_coeffs / num_fractures, modulus_size);
 
-        auto rns_num = -1;
-        std::for_each_n(seal::util::iter(rns_iter), modulus_size, [&](auto coef_iter) {
-            rns_num++;
-
+        std::uint64_t rns_num = 0;
+        std::for_each_n(seal::util::iter(rns_iter), modulus_size - 1, [&](auto coef_iter) {
             coef_iter += index * num_coeffs / num_fractures;
-            auto frac_coef_iter = fracture.rns_poly_iter(rns_num);
+            auto write_into_iter = fracture.rns_poly_iter(rns_num);
             for (uint64_t j = 0; j < num_coeffs / num_fractures; ++j)
             {
-                *frac_coef_iter = *coef_iter;
-                frac_coef_iter++;
+                *write_into_iter = *coef_iter;
+                //                fracture.rns_coefficients(j, rns_num) = *coef_iter;
                 coef_iter++;
+                write_into_iter++;
             }
+
+            rns_num++;
         });
 
         return fracture;
     }
 
-    Polynomial::Polynomial(const seal::util::ConstRNSIter &p, Essence e, std::uint64_t num_fractures) noexcept
-        : poly_data(e.coeff_count, e.coeff_modulus_size), num_fractures(num_fractures), essence(std::move(e))
+    Polynomial::Polynomial(const seal::util::ConstRNSIter &p, Essence e, std::uint64_t _num_fractures) noexcept
+        : poly_data(e.coeff_count, e.coeff_modulus_size), num_fractures(_num_fractures), essence(std::move(e))
     {
         fractures.reserve(num_fractures);
 
@@ -46,4 +48,11 @@ namespace seal::fractures
 
         return fractures[index];
     }
+
+    CiphertextFracture PolynomialFracture::operator*(const CiphertextFracture &ctxf) const
+    {
+        PolynomialFracture tmp(*this);
+        return ctxf * tmp;
+    }
+
 } // namespace seal::fractures

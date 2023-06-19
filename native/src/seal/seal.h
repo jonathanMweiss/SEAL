@@ -13,7 +13,6 @@
 #include "seal/encryptor.h"
 #include "seal/evaluator.h"
 #include "seal/fractured_ciphertext.h"
-#include "seal/fractured_poly.h"
 #include "seal/fractured_polynomial.h"
 #include "seal/fractured_rns.h"
 #include "seal/galoiskeys.h"
