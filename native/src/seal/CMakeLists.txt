@@ -19,8 +19,6 @@ set(SEAL_SOURCE_FILES ${SEAL_SOURCE_FILES}
         ${CMAKE_CURRENT_LIST_DIR}/randomgen.cpp
         ${CMAKE_CURRENT_LIST_DIR}/serialization.cpp
         ${CMAKE_CURRENT_LIST_DIR}/valcheck.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/fractured_poly.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/rns_fracture.cpp
         ${CMAKE_CURRENT_LIST_DIR}/fractured_polynomial.cpp
         ${CMAKE_CURRENT_LIST_DIR}/fractured_ciphertext.cpp
         )
@@ -53,7 +51,6 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/serialization.h
         ${CMAKE_CURRENT_LIST_DIR}/valcheck.h
         ${CMAKE_CURRENT_LIST_DIR}/version.h
-        ${CMAKE_CURRENT_LIST_DIR}/fractured_poly.h
         ${CMAKE_CURRENT_LIST_DIR}/matrix.h
         ${CMAKE_CURRENT_LIST_DIR}/fractured_rns.h
         ${CMAKE_CURRENT_LIST_DIR}/fractured_polynomial.h

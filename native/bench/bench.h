@@ -352,6 +352,7 @@ namespace sealbench
     void polynomial_fracture(benchmark::State &state, std::shared_ptr<BMEnv> bm_env);
     void fracture_ctx(benchmark::State &state, std::shared_ptr<BMEnv> bm_env);
     void fractured_plain_mult(benchmark::State &state, std::shared_ptr<BMEnv> bm_env);
+    void fractured_ctx_mult(benchmark::State &state, std::shared_ptr<BMEnv> bm_env);
 
     // NTT benchmark cases
     void bm_util_ntt_forward(benchmark::State &state, std::shared_ptr<BMEnv> bm_env);

@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace
+namespace seal::util
 {
     template <typename T>
     class matrix
@@ -18,12 +18,12 @@ namespace
         matrix() : rows(0), cols(0), data()
         {}
 
-        matrix(std::uint64_t rows, std::uint64_t cols) : rows(rows), cols(cols), data(rows * cols){};
+        matrix(std::uint64_t _rows, std::uint64_t _cols) : rows(_rows), cols(_cols), data(rows * cols){};
 
-        matrix(std::uint64_t rows, std::uint64_t cols, std::vector<T> data) : rows(rows), cols(cols), data(data)
+        matrix(std::uint64_t _rows, std::uint64_t _cols, std::vector<T> _data) : rows(_rows), cols(_cols), data(_data)
         {}
 
-        matrix(std::uint64_t rows, std::uint64_t cols, T cpy) : rows(rows), cols(cols), data(rows * cols, cpy)
+        matrix(std::uint64_t _rows, std::uint64_t _cols, T cpy) : rows(_rows), cols(_cols), data(rows * cols, cpy)
         {}
 
         inline void resize(std::uint64_t _rows, std::uint64_t _cols)
@@ -32,6 +32,7 @@ namespace
             cols = _cols;
             data.resize(rows * cols);
         };
+
 
         [[nodiscard]] inline std::uint64_t pos(std::uint64_t row, std::uint64_t col) const
         {
@@ -62,5 +63,10 @@ namespace
             }
             assert(row + col * rows < data.size());
         };
+
+        std::uint64_t entries()
+        {
+            return rows * cols;
+        }
     };
 } // namespace

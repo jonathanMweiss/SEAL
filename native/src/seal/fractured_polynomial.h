@@ -8,28 +8,31 @@
 
 namespace seal::fractures
 {
+
+    struct CiphertextFracture;
     /**
      * A class that represents a part of a polynomial that had been split.
      */
     struct PolynomialFracture
     {
-        PolynomialFracture(std::uint64_t index, std::uint64_t coeff_count, std::uint64_t modulus_size)
-            : fracture_index(index), coeff_count(coeff_count), rns_coefficients(coeff_count, modulus_size)
+        PolynomialFracture(std::uint64_t index, std::uint64_t _coeff_count, std::uint64_t modulus_size)
+            : fracture_index(index), coeff_count(_coeff_count), rns_coefficients(coeff_count, modulus_size)
         {}
 
-        seal::util::CoeffIter rns_poly_iter(std::uint64_t rns_num)
+        inline seal::util::CoeffIter rns_poly_iter(std::uint64_t rns_num)
         {
             return { &rns_coefficients(0, rns_num) };
         }
 
-        seal::util::ConstCoeffIter const_rns_poly_iter(std::uint64_t rns_num) const
+        inline seal::util::ConstCoeffIter const_rns_poly_iter(std::uint64_t rns_num) const
         {
             return { &rns_coefficients(0, rns_num) };
         }
+        CiphertextFracture operator*(const CiphertextFracture &ctxf) const;
 
         std::uint64_t fracture_index;
         std::uint64_t coeff_count;
-        matrix<std::uint64_t> rns_coefficients;
+        seal::util::matrix<std::uint64_t> rns_coefficients;
     };
 
     /**
@@ -40,10 +43,10 @@ namespace seal::fractures
     class Polynomial
     {
     public:
-        explicit Polynomial(const seal::util::ConstRNSIter &p, Essence e, std::uint64_t num_fractures) noexcept;
+        explicit Polynomial(const seal::util::ConstRNSIter &p, Essence e, std::uint64_t _num_fractures) noexcept;
 
-        explicit Polynomial(const seal::Plaintext &p, const Essence &e, std::uint64_t num_fractures) noexcept
-            : Polynomial(seal::util::ConstRNSIter(p.data(), e.coeff_count), e, num_fractures)
+        explicit Polynomial(const seal::Plaintext &p, const Essence &e, std::uint64_t _num_fractures) noexcept
+            : Polynomial(seal::util::ConstRNSIter(p.data(), e.coeff_count), e, _num_fractures)
         {}
 
         const PolynomialFracture &get_fracture(std::uint64_t index);
@@ -54,7 +57,7 @@ namespace seal::fractures
             uint64_t num_fractures, uint64_t index);
 
         std::vector<PolynomialFracture> fractures;
-        matrix<std::uint64_t> poly_data;
+        seal::util::matrix<std::uint64_t> poly_data;
         std::uint64_t num_fractures;
         const Essence essence;
     };
