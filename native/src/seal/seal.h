@@ -20,6 +20,7 @@
 #include "seal/memorymanager.h"
 #include "seal/modulus.h"
 #include "seal/plaintext.h"
+#include "seal/poly_eval.h"
 #include "seal/publickey.h"
 #include "seal/randomgen.h"
 #include "seal/randomtostd.h"

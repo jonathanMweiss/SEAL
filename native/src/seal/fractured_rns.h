@@ -24,11 +24,4 @@ namespace seal::fractures
             : ctx(std::move(_ctx)), parms(std::move(params)), coeff_modulus(parms.coeff_modulus()),
               coeff_count(parms.poly_modulus_degree()), coeff_modulus_size(coeff_modulus.size()){};
     };
-    class RnsFracture
-    {
-    public:
-        RnsFracture(
-            const seal::util::matrix<std::uint64_t> &rns_coefficients, std::uint64_t num_fractures,
-            std::uint64_t frac_index);
-    };
 } // namespace seal::fractures
