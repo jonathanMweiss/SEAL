@@ -21,6 +21,7 @@ set(SEAL_SOURCE_FILES ${SEAL_SOURCE_FILES}
         ${CMAKE_CURRENT_LIST_DIR}/valcheck.cpp
         ${CMAKE_CURRENT_LIST_DIR}/fractured_polynomial.cpp
         ${CMAKE_CURRENT_LIST_DIR}/fractured_ciphertext.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/poly_eval.cpp
         )
 
 # Add header files for installation
@@ -55,6 +56,7 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/fractured_rns.h
         ${CMAKE_CURRENT_LIST_DIR}/fractured_polynomial.h
         ${CMAKE_CURRENT_LIST_DIR}/fractured_ciphertext.h
+        ${CMAKE_CURRENT_LIST_DIR}/poly_eval.h
         DESTINATION
         ${SEAL_INCLUDES_INSTALL_DIR}/seal
 )
