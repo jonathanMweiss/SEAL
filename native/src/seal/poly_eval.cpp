@@ -4,6 +4,7 @@
 seal::fractures::PolynomialEvaluator::PolynomialEvaluator(seal::fractures::Essence e) : essence(std::move(e))
 {}
 
+
 seal::fractures::EvaluatedPoint seal::fractures::PolynomialEvaluator::Evaluate(
     seal::Plaintext &p, std::vector<std::uint64_t> &&value)
 {
@@ -52,5 +53,7 @@ seal::fractures::EvaluatedPoint seal::fractures::PolynomialEvaluator::Evaluate(
     point.rns_coefficients.data = std::move(result_vec);
     return point;
 }
+
+
 // seal::fractures::PolynomialEvaluator::PolynomialEvaluator(const seal::fractures::Essence &e)
 //{}

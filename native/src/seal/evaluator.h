@@ -75,6 +75,17 @@ namespace seal
     {
     public:
         /**
+         * Moves the plaintext into coefficient mod domain.
+         * Results in a plaintext with and increased size. matching the coeff_modulus size.
+         */
+        void plain_to_coeff_space(
+            Plaintext &plain, parms_id_type parms_id, MemoryPoolHandle pool = MemoryManager::GetPool()) const;
+        /**
+         * Expects a plaintext in coefficient mod domain and transforms it to NTT form.
+         */
+        void transform_plain_in_coeff_space_to_ntt_inplace(Plaintext &plain, parms_id_type parms_id) const;
+
+        /**
         Creates an Evaluator instance initialized with the specified SEALContext.
 
         @param[in] context The SEALContext
