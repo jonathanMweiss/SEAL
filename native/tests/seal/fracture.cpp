@@ -10,6 +10,7 @@
 #include "seal/fractured_polynomial.h"
 #include "seal/keygenerator.h"
 #include "seal/modulus.h"
+#include "seal/poly_eval.h"
 #include <cstddef>
 #include <cstdint>
 #include <ctime>
@@ -55,9 +56,7 @@ namespace sealtest
             // avoiding encoder usage - to prevent unwanted transformation to the ptx underlying elements
             std::vector<std::uint64_t> v(enc_params.poly_modulus_degree(), 0);
 
-            seal::Blake2xbPRNGFactory factory;
-            std::array<std::uint64_t, seal::prng_seed_uint64_count> seed{ 1, 2, 3, 4, 5, 6, 7, 8 };
-            auto gen = factory.create(seed);
+            shared_ptr<UniformRandomGenerator> gen = prng();
 
             auto mod = enc_params.plain_modulus().value();
             std::generate(v.begin(), v.end(), [gen = std::move(gen), &mod]() { return gen->generate() % mod; });
@@ -68,10 +67,22 @@ namespace sealtest
             }
             return p;
         }
+
+        shared_ptr<UniformRandomGenerator> prng() const
+        {
+            Blake2xbPRNGFactory factory;
+            array<uint64_t, prng_seed_uint64_count> seed{ 1, 2, 3, 4, 5, 6, 7, 8 };
+            auto gen = factory.create(seed);
+            return gen;
+        }
+
         seal::Plaintext random_ntt_plaintext() const
         {
             auto p = random_plaintext();
-            evaluator.transform_to_ntt_inplace(p, essence.ctx.first_parms_id());
+            auto pid = essence.ctx.first_parms_id();
+
+            evaluator.plain_to_coeff_space(p, pid);
+            evaluator.transform_plain_in_coeff_space_to_ntt_inplace(p, pid);
 
             return p;
         }
@@ -209,6 +220,34 @@ namespace sealtest
             fractured_matrices.emplace_back(ctx_mat.rows, ctx_mat.cols, tmp);
         }
         return fractured_matrices;
+    }
+
+    TEST(FracturedOps, PolynomialEvaluation)
+    {
+        auto all = SetupObjs::New(1 << 12);
+        seal::fractures::PolynomialEvaluator pe(all.essence);
+
+        auto ptx = all.random_plaintext();
+        auto ctx = all.random_ciphertext();
+
+        seal::Ciphertext res;
+        all.evaluator.multiply_plain(ctx, ptx, res);
+
+        // gen Point:
+        //        auto gen = all.prng();
+        //        std::vector<std::uint64_t> point(all.essence.coeff_modulus_size * 100);
+        //        for (std::uint64_t i = 0; i < all.essence.coeff_modulus_size; ++i)
+        //        {
+        //            point[i] = std::uint64_t(gen->generate() % all.essence.coeff_modulus[i].value());
+        //        }
+
+        all.evaluator.plain_to_coeff_space(ptx, all.essence.ctx.first_parms_id());
+        auto point1 = pe.evaluate(ptx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
+
+        all.evaluator.transform_from_ntt_inplace(ctx);
+        auto cpoint2 = pe.evaluate(ctx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
+
+        std::cout << "lols" << std::endl;
     }
 
     TEST(FracturedOps, MultPlain)
