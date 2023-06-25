@@ -11,6 +11,8 @@ namespace seal::fractures
         PolynomialFracture fracture(index, num_coeffs / num_fractures, modulus_size);
 
         std::uint64_t rns_num = 0;
+        // We run up to modulus_size-1 because the inner loop moves from first position to the end.
+        // for example, when mudulus_size==1, we move from 0 and up to 1,  thus we go through the whole range.
         std::for_each_n(seal::util::iter(rns_iter), modulus_size - 1, [&](auto coef_iter) {
             coef_iter += index * num_coeffs / num_fractures;
             auto write_into_iter = fracture.rns_poly_iter(rns_num);
@@ -35,7 +37,8 @@ namespace seal::fractures
 
         for (std::uint64_t i = 0; i < num_fractures; ++i)
         {
-            fractures.push_back(compute_fracture(p, essence.coeff_modulus_size, essence.coeff_count, num_fractures, i));
+            fractures.push_back(
+                compute_fracture(p, essence.parms.coeff_modulus().size(), essence.coeff_count, num_fractures, i));
         }
     }
 

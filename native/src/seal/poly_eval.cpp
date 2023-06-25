@@ -37,13 +37,18 @@ namespace seal::fractures
     EvaluatedPoint seal::fractures::PolynomialEvaluator::evalute(
         seal::util::ConstRNSIter rns_iter, const std::vector<std::uint64_t> &value) const
     {
-        std::vector<std::uint64_t> result_vec(essence.coeff_modulus.size());
+        auto ctx_data = essence.ctx.get_context_data(essence.ctx.first_parms_id());
+        auto &parms = ctx_data->parms();
+        auto &coeff_modulus = parms.coeff_modulus();
+        size_t coeff_modulus_size = coeff_modulus.size();
+
+        std::vector<std::uint64_t> result_vec(coeff_modulus_size);
 
         uint64_t i = 0;
 
         rns_iter++;
-        std::for_each_n(seal::util::iter(rns_iter), essence.coeff_modulus.size() - 1, [&](auto coef_iter) {
-            auto mod = essence.coeff_modulus[i];
+        std::for_each_n(seal::util::iter(rns_iter), coeff_modulus_size, [&](auto coef_iter) {
+            auto mod = coeff_modulus[i];
             // need to take the current powah and start going through it.
             uint64_t x = 1;
             uint64_t sum = 0;
@@ -62,7 +67,7 @@ namespace seal::fractures
             i++;
         });
 
-        EvaluatedPoint point = EvaluatedPoint(0, 1, essence.coeff_modulus_size);
+        EvaluatedPoint point = EvaluatedPoint(0, 1, coeff_modulus_size);
         point.rns_coefficients.data = std::move(result_vec);
         return point;
     }
@@ -74,7 +79,10 @@ namespace seal::fractures
             throw std::invalid_argument("Ciphertext is already in NTT form");
         }
 
-        auto result = seal::fractures::EvaluatedCipherPoint::Empty(ctx.size(), 0, 0, essence.coeff_modulus);
+        auto ctx_data = essence.ctx.get_context_data(essence.ctx.first_parms_id());
+        auto &parms = ctx_data->parms();
+        auto &coeff_modulus = parms.coeff_modulus();
+        auto result = seal::fractures::EvaluatedCipherPoint::Empty(ctx.size(), 0, 0, coeff_modulus);
 
         std::uint64_t i = 0;
         std::for_each_n(seal::util::ConstPolyIter(ctx), ctx.size(), [&](seal::util::ConstRNSIter iter) {

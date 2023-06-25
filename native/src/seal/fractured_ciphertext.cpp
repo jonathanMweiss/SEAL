@@ -21,7 +21,7 @@ namespace seal::fractures
 
         for (std::uint64_t i = 0; i < num_fractures; ++i)
         {
-            CiphertextFracture fracture{ {}, i, e.coeff_modulus };
+            CiphertextFracture fracture{ {}, i, essence.parms.coeff_modulus() };
 
             fracture.poly_fracs.reserve(ctx.size());
 
@@ -52,6 +52,7 @@ namespace seal::fractures
             {
                 auto rns_iter_num = -1;
                 // because of RNS we perform this for-each. (coeff_modulus_size elements per "coef")
+                // We go up to -1 because the inner loop will go through the last element
                 std::for_each_n(iter(p_i), ctx_parts[0].coeff_modulus.size() - 1, [&](seal::util::CoeffIter write_to) {
                     rns_iter_num++;
 
