@@ -212,4 +212,33 @@ namespace seal::fractures
     {
         return Empty(ctxf.poly_fracs.size(), ctxf.index, ctxf.poly_fracs[0].coeff_count, ctxf.coeff_modulus);
     }
+
+    bool CiphertextFracture::operator==(const CiphertextFracture &ctxf)
+    {
+        if (index != ctxf.index)
+        {
+            return false;
+        }
+        if (poly_fracs.size() != ctxf.poly_fracs.size())
+        {
+            return false;
+        }
+
+        for (std::uint64_t i = 0; i < poly_fracs.size(); ++i)
+        {
+            if (poly_fracs[i].rns_coefficients.data.size() != ctxf.poly_fracs[i].rns_coefficients.data.size())
+            {
+                return false;
+            }
+            for (std::uint64_t j = 0; j < poly_fracs[i].rns_coefficients.data.size(); ++j)
+            {
+                if (poly_fracs[i].rns_coefficients.data[j] != ctxf.poly_fracs[i].rns_coefficients.data[j])
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
 } // namespace seal::fractures
