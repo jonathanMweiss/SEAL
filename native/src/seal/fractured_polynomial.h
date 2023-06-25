@@ -57,7 +57,6 @@ namespace seal::fractures
             uint64_t num_fractures, uint64_t index);
 
         std::vector<PolynomialFracture> fractures;
-        seal::util::matrix<std::uint64_t> poly_data;
         std::uint64_t num_fractures;
         const Essence essence;
     };

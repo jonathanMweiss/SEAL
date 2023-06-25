@@ -29,7 +29,7 @@ namespace seal::fractures
     }
 
     Polynomial::Polynomial(const seal::util::ConstRNSIter &p, Essence e, std::uint64_t _num_fractures) noexcept
-        : poly_data(e.coeff_count, e.coeff_modulus_size), num_fractures(_num_fractures), essence(std::move(e))
+        : num_fractures(_num_fractures), essence(std::move(e))
     {
         fractures.reserve(num_fractures);
 
