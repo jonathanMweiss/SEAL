@@ -2276,6 +2276,11 @@ namespace seal
         size_t coeff_count = parms.poly_modulus_degree();
         size_t coeff_modulus_size = coeff_modulus.size();
 
+        if (plain.dyn_array().size() < coeff_count * coeff_modulus_size)
+        {
+            throw std::invalid_argument("Plaintext is too small. put in RNS representation.");
+        }
+
         RNSIter plain_iter(plain.data(), coeff_count);
 
         auto ntt_tables = iter(context_data.small_ntt_tables());
