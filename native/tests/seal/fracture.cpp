@@ -233,20 +233,18 @@ namespace sealtest
         seal::Ciphertext res;
         all.evaluator.multiply_plain(ctx, ptx, res);
 
-        // gen Point:
-        //        auto gen = all.prng();
-        //        std::vector<std::uint64_t> point(all.essence.coeff_modulus_size * 100);
-        //        for (std::uint64_t i = 0; i < all.essence.coeff_modulus_size; ++i)
-        //        {
-        //            point[i] = std::uint64_t(gen->generate() % all.essence.coeff_modulus[i].value());
-        //        }
-
         all.evaluator.plain_to_coeff_space(ptx, all.essence.ctx.first_parms_id());
         auto point1 = pe.evaluate(ptx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
 
         all.evaluator.transform_from_ntt_inplace(ctx);
-        auto cpoint2 = pe.evaluate(ctx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
+        auto cpoint = pe.evaluate(ctx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
 
+        all.evaluator.transform_from_ntt_inplace(res);
+        auto rpoint = pe.evaluate(res, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
+
+        auto actual = point1 * cpoint;
+        // compare:
+        ASSERT_TRUE(actual == rpoint);
         std::cout << "lols" << std::endl;
     }
 

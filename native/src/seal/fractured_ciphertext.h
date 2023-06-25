@@ -21,6 +21,8 @@ namespace seal::fractures
         const CiphertextFracture &operator+=(const CiphertextFracture &ctxf);
         const CiphertextFracture &operator*=(const CiphertextFracture &y);
 
+        bool operator==(const CiphertextFracture &ctxf);
+
         // TODO: verify.
         CiphertextFracture operator*(const PolynomialFracture &poly) const;
         CiphertextFracture operator*(const CiphertextFracture &y) const;
