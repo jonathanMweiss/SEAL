@@ -261,6 +261,32 @@ namespace sealtest
         }
     }
 
+    TEST(PolyEvaluate, ctxAddCtx)
+    {
+        auto all = SetupObjs::New(1 << 12);
+        seal::fractures::PolynomialEvaluator pe(all.essence);
+
+        for (int i = 0; i < 500; ++i)
+        {
+            auto ctx1 = all.random_ciphertext();
+            auto ctx2 = all.random_ciphertext();
+            seal::Ciphertext addition_res;
+
+            all.evaluator.add(ctx1, ctx2, addition_res);
+
+            all.evaluator.transform_from_ntt_inplace(ctx1);
+            all.evaluator.transform_from_ntt_inplace(ctx2);
+
+            auto c1 = pe.evaluate(ctx1, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
+            auto c2 = pe.evaluate(ctx2, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
+            auto actual = c1 + c2;
+
+            all.evaluator.transform_from_ntt_inplace(addition_res);
+            auto expected = pe.evaluate(addition_res, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
+            ASSERT_TRUE(expected == actual);
+        }
+    }
+
     TEST(FracturedOps, PolyEvalEquals)
     {
         auto all = SetupObjs::New(1 << 12);
