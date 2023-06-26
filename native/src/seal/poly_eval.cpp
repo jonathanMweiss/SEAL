@@ -86,7 +86,8 @@ namespace seal::fractures
 
         std::uint64_t i = 0;
         std::for_each_n(seal::util::ConstPolyIter(ctx), ctx.size(), [&](seal::util::ConstRNSIter iter) {
-            result.poly_fracs[i++] = evalute(iter, value);
+            result.poly_fracs[i] = evalute(iter, value);
+            i++;
         });
 
         return result;
