@@ -29,6 +29,7 @@ namespace seal::fractures
             return { &rns_coefficients(0, rns_num) };
         }
         CiphertextFracture operator*(const CiphertextFracture &ctxf) const;
+        bool operator==(const PolynomialFracture &other) const;
 
         std::uint64_t fracture_index;
         std::uint64_t coeff_count;
