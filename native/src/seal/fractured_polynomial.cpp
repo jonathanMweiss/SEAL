@@ -52,6 +52,11 @@ namespace seal::fractures
         return fractures[index];
     }
 
+    const PolynomialFracture &Polynomial::operator[](std::uint64_t index)
+    {
+        return fractures[index];
+    }
+
     CiphertextFracture PolynomialFracture::operator*(const CiphertextFracture &ctxf) const
     {
         PolynomialFracture tmp(*this);

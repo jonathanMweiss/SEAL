@@ -51,6 +51,7 @@ namespace seal::fractures
         {}
 
         const PolynomialFracture &get_fracture(std::uint64_t index);
+        const PolynomialFracture &operator[](std::uint64_t index);
 
     private:
         static PolynomialFracture compute_fracture(
