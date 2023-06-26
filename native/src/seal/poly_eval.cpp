@@ -46,8 +46,6 @@ namespace seal::fractures
         std::vector<std::uint64_t> result_vec(coeff_modulus_size);
 
         uint64_t i = 0;
-
-        rns_iter++;
         std::for_each_n(seal::util::iter(rns_iter), coeff_modulus_size, [&](auto coef_iter) {
             auto mod = coeff_modulus[i];
             // need to take the current powah and start going through it.
