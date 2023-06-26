@@ -94,6 +94,15 @@ namespace sealtest
             encryptor.encrypt_symmetric(ptx, ctx);
             return ctx;
         }
+
+        seal::Ciphertext random_nontt_ciphertext()
+        {
+            auto ptx = random_plaintext();
+            seal::Ciphertext ctx;
+            encryptor.encrypt_symmetric(ptx, ctx);
+            evaluator.transform_from_ntt_inplace(ctx);
+            return ctx;
+        }
     };
 
     seal::Ciphertext ctxWithSize3(const SetupObjs &all)
@@ -222,7 +231,37 @@ namespace sealtest
         return fractured_matrices;
     }
 
-    TEST(FracturedOps, PolynomialEvaluation)
+    TEST(PolyEvaluate, PtxIsScalar)
+    {
+        auto all = SetupObjs::New(1 << 12);
+        seal::fractures::PolynomialEvaluator pe(all.essence);
+
+        for (int i = 0; i < 10; ++i)
+        {
+            auto ctx = all.random_ciphertext();
+
+            all.evaluator.transform_from_ntt_inplace(ctx);
+            auto actual = pe.evaluate(ctx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
+
+            seal::Plaintext p1(all.essence.parms.poly_modulus_degree());
+            p1[0] = std::uint64_t(all.prng()->generate()) % all.essence.parms.plain_modulus().value();
+
+            all.evaluator.plain_to_coeff_space(p1, all.essence.ctx.first_parms_id());
+            auto point = pe.evaluate(p1, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
+
+            all.evaluator.transform_plain_in_coeff_space_to_ntt_inplace(p1, all.essence.ctx.first_parms_id());
+
+            all.evaluator.transform_to_ntt_inplace(ctx);
+            all.evaluator.multiply_plain_inplace(ctx, p1);
+            all.evaluator.transform_from_ntt_inplace(ctx);
+
+            auto expected = pe.evaluate(ctx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
+
+            ASSERT_TRUE(expected == (actual * point));
+        }
+    }
+
+    TEST(FracturedOps, PolyEvalEquals)
     {
         auto all = SetupObjs::New(1 << 12);
         seal::fractures::PolynomialEvaluator pe(all.essence);
@@ -233,7 +272,7 @@ namespace sealtest
         seal::Ciphertext res;
         all.evaluator.multiply_plain(ctx, ptx, res);
 
-        all.evaluator.plain_to_coeff_space(ptx, all.essence.ctx.first_parms_id());
+        all.evaluator.plain_to_coeff_space(ptx, all.essence.parms.parms_id());
         auto point1 = pe.evaluate(ptx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
 
         all.evaluator.transform_from_ntt_inplace(ctx);
@@ -242,9 +281,9 @@ namespace sealtest
         all.evaluator.transform_from_ntt_inplace(res);
         auto rpoint = pe.evaluate(res, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
 
-        auto actual = point1 * cpoint;
+        cpoint *= point1;
         // compare:
-        ASSERT_TRUE(actual == rpoint);
+        ASSERT_TRUE(cpoint == rpoint);
         std::cout << "lols" << std::endl;
     }
 
