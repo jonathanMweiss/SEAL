@@ -48,7 +48,7 @@ namespace seal::fractures
         uint64_t i = 0;
         std::for_each_n(seal::util::iter(rns_iter), coeff_modulus_size, [&](auto coef_iter) {
             auto mod = coeff_modulus[i];
-            // need to take the current powah and start going through it.
+
             uint64_t x = 1;
             uint64_t sum = 0;
             for (uint64_t j = 0; j < essence.coeff_count; ++j)
@@ -58,11 +58,12 @@ namespace seal::fractures
 
                 // x = value^i+1 Advance: after using the power.
                 x = util::multiply_uint_mod(x, value[i], mod);
+
                 coef_iter++;
             }
+            result_vec[i] = sum;
 
             // advance the iteration.
-            result_vec[i] = sum;
             i++;
         });
 
