@@ -34,6 +34,7 @@ namespace seal::fractures
         return evalute(rns_iter, value);
     }
 
+    // TODO something is wrong here...
     EvaluatedPoint seal::fractures::PolynomialEvaluator::evalute(
         seal::util::ConstRNSIter rns_iter, const std::vector<std::uint64_t> &value) const
     {

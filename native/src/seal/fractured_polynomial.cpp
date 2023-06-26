@@ -58,4 +58,22 @@ namespace seal::fractures
         return ctxf * tmp;
     }
 
+    bool PolynomialFracture::operator==(const PolynomialFracture &other) const
+    {
+        if (rns_coefficients.data.size() != other.rns_coefficients.data.size())
+        {
+            return false;
+        }
+
+        for (std::uint64_t j = 0; j < rns_coefficients.data.size(); ++j)
+        {
+            if (rns_coefficients.data[j] != other.rns_coefficients.data[j])
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
 } // namespace seal::fractures

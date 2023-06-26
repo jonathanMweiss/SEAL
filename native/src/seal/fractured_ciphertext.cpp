@@ -70,10 +70,12 @@ namespace seal::fractures
 
         return ctx;
     }
+
     uint64_t CiphertextShredder::num_fractures()
     {
         return ctx_parts.size();
     }
+
     void CiphertextShredder::set_fracture(uint64_t i, CiphertextFracture fracture)
     {
         ctx_parts[i] = std::move(fracture);
@@ -98,6 +100,7 @@ namespace seal::fractures
 
         return *this;
     }
+
     const CiphertextFracture &CiphertextFracture::operator+=(const CiphertextFracture &ctxf)
     {
         if (index != ctxf.index)
@@ -178,6 +181,7 @@ namespace seal::fractures
 
         return *this;
     }
+
     CiphertextFracture CiphertextFracture::operator*(const CiphertextFracture &y) const
     {
         CiphertextFracture cpy(*this);
@@ -198,6 +202,7 @@ namespace seal::fractures
         cpy *= poly;
         return cpy;
     }
+
     CiphertextFracture CiphertextFracture::Empty(
         std::uint64_t num_polys, std::uint64_t index, std::uint64_t num_coefs, std::vector<seal::Modulus> coef_mod)
     {
@@ -208,6 +213,7 @@ namespace seal::fractures
         }
         return tmp;
     }
+
     CiphertextFracture CiphertextFracture::Empty(const CiphertextFracture &ctxf)
     {
         return Empty(ctxf.poly_fracs.size(), ctxf.index, ctxf.poly_fracs[0].coeff_count, ctxf.coeff_modulus);
@@ -219,6 +225,7 @@ namespace seal::fractures
         {
             return false;
         }
+
         if (poly_fracs.size() != ctxf.poly_fracs.size())
         {
             return false;
@@ -226,17 +233,12 @@ namespace seal::fractures
 
         for (std::uint64_t i = 0; i < poly_fracs.size(); ++i)
         {
-            if (poly_fracs[i].rns_coefficients.data.size() != ctxf.poly_fracs[i].rns_coefficients.data.size())
+            if (poly_fracs[i] == ctxf.poly_fracs[i])
             {
-                return false;
+                continue;
             }
-            for (std::uint64_t j = 0; j < poly_fracs[i].rns_coefficients.data.size(); ++j)
-            {
-                if (poly_fracs[i].rns_coefficients.data[j] != ctxf.poly_fracs[i].rns_coefficients.data[j])
-                {
-                    return false;
-                }
-            }
+
+            return false;
         }
 
         return true;
