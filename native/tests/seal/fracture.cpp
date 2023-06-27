@@ -261,41 +261,40 @@ namespace sealtest
         }
     }
 
-    /**
-     * Ctx*Scalar Works. CTX * poly doesn't work.
-     * we know that x=(1,2,3,4,5).
-     * ctx(x) * p(x) != ctx*p(x) that is:
-     * [ctx1(x)*p(x), ctx2(x)*p(x)] != [ctx1*p(x), ctx2*p(x)].
-     * Then why are they not equal?
-     * ctx1 alreay contains the noise... so it isn't the noise itself.
-     */
     TEST(PolyEvaluate, ctxMultPtx)
     {
-        auto all = SetupObjs::New(1 << 10);
+        // TODO: maybe im not getting the right value?
+        //   it seems to work when RNS-size ==1.
+        auto all = SetupObjs::New(1 << 11);
         seal::fractures::PolynomialEvaluator pe(all.essence);
         auto prng = all.prng();
 
         auto ctx1 = all.random_ciphertext();
-        seal::Plaintext ptx(all.essence.parms.poly_modulus_degree());
-        ptx[0] = std::uint64_t(prng->generate()) % all.essence.parms.plain_modulus().value();
-//        ptx[1] = std::uint64_t(prng->generate()) % all.essence.parms.plain_modulus().value();
+        auto ptx = all.random_plaintext();
 
         seal::Ciphertext mult_res;
 
+        auto ctx_data = all.context.get_context_data(all.context.first_parms_id());
+        auto root = ctx_data->small_ntt_tables()->get_root();
+        auto rns_tool = ctx_data->rns_tool();
+        auto root_rns = std::vector<std::uint64_t>(all.enc_params.coeff_modulus().size(), root);
+        rns_tool->base_q()->decompose(&(root_rns[0]), MemoryManager::GetPool());
+        std::cout << "root_rns size: " << root_rns.size() << std::endl;
+
         all.evaluator.plain_to_coeff_space(ptx, all.essence.ctx.first_parms_id());
-        auto p1 = pe.evaluate(ptx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
+        auto p1 = pe.evaluate(ptx, root_rns);
 
         all.evaluator.transform_plain_in_coeff_space_to_ntt_inplace(ptx, all.essence.ctx.first_parms_id());
         all.evaluator.multiply_plain(ctx1, ptx, mult_res);
 
         all.evaluator.transform_from_ntt_inplace(ctx1);
-        auto c1 = pe.evaluate(ctx1, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
+        auto c1 = pe.evaluate(ctx1, root_rns);
 
         auto actual = c1 * p1;
 
         //
         all.evaluator.transform_from_ntt_inplace(mult_res);
-        auto expected = pe.evaluate(mult_res, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
+        auto expected = pe.evaluate(mult_res, root_rns);
         ASSERT_TRUE(expected == actual);
     }
 
