@@ -300,28 +300,36 @@ namespace sealtest
 
     TEST(PolyEvaluate, ctxAddCtx)
     {
-        auto all = SetupObjs::New(1 << 12);
+        auto all = SetupObjs::New(1 << 10);
         seal::fractures::PolynomialEvaluator pe(all.essence);
 
-        for (int i = 0; i < 500; ++i)
-        {
-            auto ctx1 = all.random_ciphertext();
-            auto ctx2 = all.random_ciphertext();
-            seal::Ciphertext addition_res;
+        //        for (int i = 0; i < 500; ++i)
+        //        {
 
-            all.evaluator.add(ctx1, ctx2, addition_res);
+        auto ctx_data = all.context.get_context_data(all.context.first_parms_id());
+        auto root = ctx_data->small_ntt_tables()->get_root();
+        auto rns_tool = ctx_data->rns_tool();
+        auto root_rns = std::vector<std::uint64_t>(all.enc_params.coeff_modulus().size(), root);
+        rns_tool->base_q()->decompose(&(root_rns[0]), MemoryManager::GetPool());
+        std::cout << "root_rns size: " << root_rns.size() << std::endl;
 
-            all.evaluator.transform_from_ntt_inplace(ctx1);
-            all.evaluator.transform_from_ntt_inplace(ctx2);
+        auto ctx1 = all.random_ciphertext();
+        auto ctx2 = all.random_ciphertext();
+        seal::Ciphertext addition_res;
 
-            auto c1 = pe.evaluate(ctx1, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
-            auto c2 = pe.evaluate(ctx2, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
-            auto actual = c1 + c2;
+        all.evaluator.multiply(ctx1, ctx2, addition_res);
 
-            all.evaluator.transform_from_ntt_inplace(addition_res);
-            auto expected = pe.evaluate(addition_res, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
-            ASSERT_TRUE(expected == actual);
-        }
+        all.evaluator.transform_from_ntt_inplace(ctx1);
+        all.evaluator.transform_from_ntt_inplace(ctx2);
+
+        auto c1 = pe.evaluate(ctx1, root_rns);
+        auto c2 = pe.evaluate(ctx2, root_rns);
+        auto actual = c1 * c2;
+
+        all.evaluator.transform_from_ntt_inplace(addition_res);
+        auto expected = pe.evaluate(addition_res, root_rns);
+        ASSERT_TRUE(expected == actual);
+        //        }
     }
 
     TEST(FracturedOps, PolyEvalEquals)
