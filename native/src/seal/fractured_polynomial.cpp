@@ -81,4 +81,59 @@ namespace seal::fractures
         return true;
     }
 
+    std::streamoff PolynomialFracture::save_size(compr_mode_type compr_mode) const
+    {
+        // computing actual size of matrix in bytes:
+        std::size_t data_size = rns_coefficients.cols * rns_coefficients.rows * sizeof(std::uint64_t);
+
+        size_t members_size = Serialization::ComprSizeEstimate(
+            util::add_safe(
+                sizeof(std::uint64_t), // data_per_rns (rows)
+                sizeof(std::uint64_t), // rns_coefficients (cols)
+                sizeof(std::uint64_t), // fracture_index
+                data_size),
+            compr_mode);
+
+        return util::safe_cast<std::streamoff>(util::add_safe(sizeof(Serialization::SEALHeader), members_size));
+    }
+
+    void PolynomialFracture::save_members(std::ostream &stream) const
+    {
+        auto old_except_mask = stream.exceptions();
+        try
+        {
+            // Throw exceptions on std::ios_base::badbit and std::ios_base::failbit
+            stream.exceptions(std::ios_base::badbit | std::ios_base::failbit);
+
+            auto num_values_byte = static_cast<seal_byte>(this->rns_coefficients.rows);
+            stream.write(reinterpret_cast<const char *>(&num_values_byte), sizeof(uint64_t));
+
+            auto modulus_size_byte = static_cast<seal_byte>(this->rns_coefficients.cols);
+            stream.write(reinterpret_cast<const char *>(&modulus_size_byte), sizeof(uint64_t));
+
+            auto index_num_byte = static_cast<seal_byte>(this->fracture_index);
+            stream.write(reinterpret_cast<const char *>(&index_num_byte), sizeof(uint64_t));
+
+            auto data_size = this->rns_coefficients.cols * this->rns_coefficients.rows * sizeof(std::uint64_t);
+            if (data_size > std::numeric_limits<std::streamsize>::max())
+            {
+                throw std::runtime_error("data_size is too large");
+            }
+
+            stream.write(
+                reinterpret_cast<const char *>(this->rns_coefficients.data.data()), static_cast<long>(data_size));
+        }
+        catch (const std::ios_base::failure &)
+        {
+            stream.exceptions(old_except_mask);
+            throw std::runtime_error("I/O error");
+        }
+        catch (...)
+        {
+            stream.exceptions(old_except_mask);
+            throw;
+        }
+        stream.exceptions(old_except_mask);
+    }
+
 } // namespace seal::fractures
