@@ -38,9 +38,6 @@ namespace seal::fractures
         // Returns the size of the object in bytes, as if written to a stream.
         std::streamoff save_size(compr_mode_type compr_mode) const;
 
-        // Saves the object to an output stream.
-        void save_members(std::ostream &stream) const;
-
         inline std::streamoff save(
             std::ostream &stream, compr_mode_type compr_mode = Serialization::compr_mode_default) const
         {
@@ -49,6 +46,17 @@ namespace seal::fractures
                 std::bind(&PolynomialFracture::save_members, this, _1), save_size(compr_mode_type::none), stream,
                 compr_mode, false);
         }
+
+        inline std::streamoff load(const seal_byte *in, std::size_t size)
+        {
+            using namespace std::placeholders;
+            return Serialization::Load(std::bind(&PolynomialFracture::load_members, this, _1, _2), in, size, false);
+        }
+
+    private:
+        // Saves the object to an output stream.
+        void save_members(std::ostream &stream) const;
+        void load_members(std::istream &stream, SEALVersion version);
     };
 
     /**
