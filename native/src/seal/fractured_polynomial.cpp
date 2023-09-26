@@ -136,4 +136,35 @@ namespace seal::fractures
         stream.exceptions(old_except_mask);
     }
 
+    void PolynomialFracture::load_members(std::istream &stream, SEAL_MAYBE_UNUSED SEALVersion version)
+    {
+        auto old_except_mask = stream.exceptions();
+        try
+        {
+            stream.read(reinterpret_cast<char *>(&this->rns_coefficients.rows), sizeof(uint64_t));
+            stream.read(reinterpret_cast<char *>(&this->rns_coefficients.cols), sizeof(uint64_t));
+            stream.read(reinterpret_cast<char *>(&this->fracture_index), sizeof(uint64_t));
+
+            auto rows = this->rns_coefficients.rows;
+            auto cols = this->rns_coefficients.cols;
+
+            this->rns_coefficients =
+                seal::util::matrix<std::uint64_t>(this->rns_coefficients.rows, this->rns_coefficients.cols);
+            stream.read(
+                reinterpret_cast<char *>(&this->rns_coefficients.data[0]),
+                static_cast<long>(rows * cols * sizeof(std::uint64_t)));
+        }
+        catch (const std::ios_base::failure &)
+        {
+            stream.exceptions(old_except_mask);
+            throw std::runtime_error("I/O error");
+        }
+        catch (...)
+        {
+            stream.exceptions(old_except_mask);
+            throw;
+        }
+        stream.exceptions(old_except_mask);
+    }
+
 } // namespace seal::fractures
