@@ -15,6 +15,10 @@ namespace seal::fractures
      */
     struct PolynomialFracture
     {
+        std::uint64_t fracture_index;
+        std::uint64_t coeff_count;
+        seal::util::matrix<std::uint64_t> rns_coefficients;
+
         PolynomialFracture(std::uint64_t index, std::uint64_t _coeff_count, std::uint64_t modulus_size)
             : fracture_index(index), coeff_count(_coeff_count), rns_coefficients(coeff_count, modulus_size)
         {}
@@ -31,9 +35,20 @@ namespace seal::fractures
         CiphertextFracture operator*(const CiphertextFracture &ctxf) const;
         bool operator==(const PolynomialFracture &other) const;
 
-        std::uint64_t fracture_index;
-        std::uint64_t coeff_count;
-        seal::util::matrix<std::uint64_t> rns_coefficients;
+        // Returns the size of the object in bytes, as if written to a stream.
+        std::streamoff save_size(compr_mode_type compr_mode) const;
+
+        // Saves the object to an output stream.
+        void save_members(std::ostream &stream) const;
+
+        inline std::streamoff save(
+            std::ostream &stream, compr_mode_type compr_mode = Serialization::compr_mode_default) const
+        {
+            using namespace std::placeholders;
+            return Serialization::Save(
+                std::bind(&PolynomialFracture::save_members, this, _1), save_size(compr_mode_type::none), stream,
+                compr_mode, false);
+        }
     };
 
     /**
