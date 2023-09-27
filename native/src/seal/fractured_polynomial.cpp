@@ -57,6 +57,56 @@ namespace seal::fractures
         return fractures[index];
     }
 
+    std::streamoff Polynomial::save_size(compr_mode_type compr_mode) const
+    {
+        auto members_size = sizeof(std::uint64_t); // num_fractures as a start.
+
+        // then each fracture and its size.
+        for (auto &pf : fractures)
+        {
+            auto pf_size = pf.save_size(compr_mode);
+            members_size = util::add_safe(
+                static_cast<std::size_t>(members_size), // adding to oneself.
+                static_cast<std::size_t>(sizeof(std::uint64_t)), // setting size for frac size
+                static_cast<std::size_t>(pf_size) // size the frac needs.
+            );
+        }
+
+        return util::safe_cast<std::streamoff>(Serialization::ComprSizeEstimate(
+            util::add_safe(
+                members_size, // adding to oneself.
+                sizeof(Serialization::SEALHeader)),
+            compr_mode));
+    }
+
+    void Polynomial::save_members(std::ostream &stream) const
+    {
+        auto old_except_mask = stream.exceptions();
+        try
+        {
+            stream.write(reinterpret_cast<const char *>(&num_fractures), sizeof(std::uint64_t));
+            // each element should have some kind of size.
+            for (auto &pf : fractures)
+            {
+                auto save_size = pf.save_size(compr_mode_type::none);
+                stream.write(reinterpret_cast<const char *>(&save_size), sizeof(std::uint64_t));
+                pf.save(stream);
+            }
+        }
+        catch (const std::ios_base::failure &)
+        {
+            stream.exceptions(old_except_mask);
+            throw std::runtime_error("I/O error");
+        }
+        catch (...)
+        {
+            stream.exceptions(old_except_mask);
+            throw;
+        }
+
+        stream.exceptions(old_except_mask);
+    }
+
     CiphertextFracture PolynomialFracture::operator*(const CiphertextFracture &ctxf) const
     {
         PolynomialFracture tmp(*this);

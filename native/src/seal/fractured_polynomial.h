@@ -35,7 +35,7 @@ namespace seal::fractures
         CiphertextFracture operator*(const CiphertextFracture &ctxf) const;
         bool operator==(const PolynomialFracture &other) const;
 
-        // Returns the size of the object in bytes, as if written to a stream.
+        /** Returns the size of the object in bytes, as if written to a stream. **/
         std::streamoff save_size(compr_mode_type compr_mode) const;
 
         inline std::streamoff save(
@@ -78,7 +78,16 @@ namespace seal::fractures
         const PolynomialFracture &get_fracture(std::uint64_t index);
         const PolynomialFracture &operator[](std::uint64_t index);
 
+        /**
+         * states the size of 'save' for the polynomial to an output stream. doesn't saves the fracture::Essence object.
+         * @param compr_mode
+         * @return the save size.
+         */
+        std::streamoff save_size(compr_mode_type compr_mode) const;
+
     private:
+        void save_members(std::ostream &stream) const;
+
         static PolynomialFracture compute_fracture(
             const seal::util::ConstRNSIter &rns_iter, std::uint64_t modulus_size, uint64_t num_coeffs,
             uint64_t num_fractures, uint64_t index);
