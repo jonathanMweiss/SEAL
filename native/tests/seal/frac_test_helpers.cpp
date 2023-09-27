@@ -103,7 +103,7 @@ namespace sealtest
         }
     };
 
-    std::vector<seal::Ciphertext> random_ctxs(const SetupObjs &all, int size)
+    std::vector<seal::Ciphertext> random_ctx_vector(const SetupObjs &all, int size)
     {
         std::vector<seal::Ciphertext> ctxs;
         for (int i = 0; i < size; ++i)

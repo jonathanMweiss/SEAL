@@ -57,6 +57,8 @@ namespace seal::fractures
         // Saves the object to an output stream.
         void save_members(std::ostream &stream) const;
         void load_members(std::istream &stream, SEALVersion version);
+
+        std::size_t compute_data_size() const;
     };
 
     /**
