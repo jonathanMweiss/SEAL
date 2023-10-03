@@ -465,5 +465,40 @@ namespace sealtest::fracture
             pf3.load(stream);
             ASSERT_TRUE(pf3 == pf);
         }
+
+        TEST(FracturedOps, serializeCipherFrac)
+        {
+            auto all = SetupObjs::New();
+            auto gen = all.prng();
+
+            std::uint64_t index = gen->generate();
+            std::uint64_t coeff_count = gen->generate() % 256;
+            auto modulus = all.essence.parms.coeff_modulus();
+            std::uint64_t num_polys = gen->generate() % 10;
+            auto cf = fractures::CiphertextFracture::Empty(num_polys, index, coeff_count, modulus);
+            for (std::uint64_t i = 0; i < num_polys; ++i)
+            {
+                fractures::PolynomialFracture pf(index, coeff_count, modulus.size());
+                for (auto &d : pf.rns_coefficients.data)
+                {
+                    d = gen->generate();
+                }
+                cf.poly_fracs[i] = pf;
+            }
+
+            stringstream stream;
+            cf.save(stream);
+
+            auto cf2 = fractures::CiphertextFracture::Empty(num_polys, index, coeff_count, modulus);
+
+            auto st = stream.str();
+            cf2.load((seal::seal_byte *)&st[0], stream.str().length());
+            ASSERT_TRUE(cf2 == cf);
+
+            auto cf3 = fractures::CiphertextFracture::Empty(num_polys, index, coeff_count, modulus);
+            cf3.load(stream);
+            ASSERT_TRUE(cf3 == cf);
+        }
+
     } // namespace serialization
 } // namespace sealtest::fracture

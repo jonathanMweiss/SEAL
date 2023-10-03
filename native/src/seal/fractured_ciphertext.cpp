@@ -243,4 +243,95 @@ namespace seal::fractures
 
         return true;
     }
+
+    // expects the module to be sent some other way.
+    std::streamoff CiphertextFracture::save_size(compr_mode_type compr_mode) const
+    {
+        auto members_size = util::add_safe(
+            sizeof(std::uint64_t), // index (the index value of this fracture).
+            sizeof(std::uint64_t) // num polynomial fractions (can be 2-3).
+        );
+
+        // then each fracture and its size.
+        for (auto &pf : poly_fracs)
+        {
+            auto pf_size = pf.save_size(compr_mode);
+            members_size = util::add_safe(
+                static_cast<std::size_t>(members_size), // adding to oneself.
+                static_cast<std::size_t>(sizeof(std::uint64_t)), // setting size for frac size
+                static_cast<std::size_t>(pf_size) // size the frac needs.
+            );
+        }
+
+        return util::safe_cast<std::streamoff>(Serialization::ComprSizeEstimate(
+            util::add_safe(
+                members_size, // adding to oneself.
+                sizeof(Serialization::SEALHeader)),
+            compr_mode));
+    }
+
+    void CiphertextFracture::save_members(std::ostream &stream) const
+    {
+        auto old_except_mask = stream.exceptions();
+        auto num_fracs = poly_fracs.size();
+        try
+        {
+            stream.write(reinterpret_cast<const char *>(&index), sizeof(std::uint64_t));
+            stream.write(reinterpret_cast<const char *>(&num_fracs), sizeof(std::uint64_t));
+
+            for (auto &pf : poly_fracs)
+            {
+                //                auto save_size = pf.save_size(compr_mode_type::none);
+                //                stream.write(reinterpret_cast<const char *>(&save_size), sizeof(std::uint64_t));
+                pf.save(stream);
+            }
+        }
+        catch (const std::ios_base::failure &)
+        {
+            stream.exceptions(old_except_mask);
+            throw std::runtime_error("I/O error");
+        }
+        catch (...)
+        {
+            stream.exceptions(old_except_mask);
+            throw;
+        }
+
+        stream.exceptions(old_except_mask);
+    }
+    void CiphertextFracture::load_members(std::istream &stream, SEAL_MAYBE_UNUSED SEALVersion version)
+    {
+        auto old_except_mask = stream.exceptions();
+        try
+        {
+            stream.read(reinterpret_cast<char *>(&index), sizeof(std::uint64_t));
+            std::uint64_t num_fracs;
+            stream.read(reinterpret_cast<char *>(&num_fracs), sizeof(std::uint64_t));
+
+            poly_fracs.reserve(num_fracs);
+            for (std::uint64_t i = 0; i < num_fracs; ++i)
+            {
+                //                std::uint64_t pf_size;
+                //                stream.read(reinterpret_cast<char *>(&pf_size), sizeof(std::uint64_t));
+
+                PolynomialFracture pf(index, 0, coeff_modulus.size());
+                pf.load(stream);
+                //                std::vector<seal::seal_byte> bts(pf_size);
+                //                stream.read(reinterpret_cast<char *>(&bts[0]), static_cast<long>(pf_size));
+                //                pf.load(reinterpret_cast<seal_byte *>(&bts[0]), pf_size);
+                poly_fracs[i] = std::move(pf);
+            }
+        }
+        catch (const std::ios_base::failure &)
+        {
+            stream.exceptions(old_except_mask);
+            throw std::runtime_error("I/O error");
+        }
+        catch (...)
+        {
+            stream.exceptions(old_except_mask);
+            throw;
+        }
+        stream.exceptions(old_except_mask);
+    }
 } // namespace seal::fractures
