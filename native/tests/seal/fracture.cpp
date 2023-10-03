@@ -460,6 +460,10 @@ namespace sealtest::fracture
             auto st = stream.str();
             pf2.load((seal::seal_byte *)&st[0], stream.str().length());
             ASSERT_TRUE(pf2 == pf);
+
+            fractures::PolynomialFracture pf3(index, coeff_count, modulus_rns_size);
+            pf3.load(stream);
+            ASSERT_TRUE(pf3 == pf);
         }
     } // namespace serialization
 } // namespace sealtest::fracture

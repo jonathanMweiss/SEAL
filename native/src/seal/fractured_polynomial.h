@@ -53,6 +53,12 @@ namespace seal::fractures
             return Serialization::Load(std::bind(&PolynomialFracture::load_members, this, _1, _2), in, size, false);
         }
 
+        inline std::streamoff load(std::istream &in)
+        {
+            using namespace std::placeholders;
+            return Serialization::Load(std::bind(&PolynomialFracture::load_members, this, _1, _2), in, false);
+        }
+
     private:
         // Saves the object to an output stream.
         void save_members(std::ostream &stream) const;
