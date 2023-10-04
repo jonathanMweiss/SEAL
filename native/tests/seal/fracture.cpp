@@ -434,6 +434,15 @@ namespace sealtest::fracture
             ASSERT_TRUE(expected[0].is_transparent());
         }
 
+        TEST(FracturedOps, ptxCtxMultThenCtxMult)
+        {
+                ASSERT_TRUE(false);
+        }
+
+        TEST(FracturedOps, ptxMatrixMultWithQueryiesFromLeftAndRight)
+        {
+                ASSERT_TRUE(false);
+        }
     } // namespace operations
 
     namespace serialization
