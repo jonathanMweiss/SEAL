@@ -140,9 +140,22 @@ namespace sealtest
     }
 
     template <typename T, typename U>
-    void verify_dims(const seal::util::matrix<T> &a, const seal::util::matrix<U> &b)
+    void verify_not_empty_matrices(const seal::util::matrix<T> &left, const seal::util::matrix<U> &right)
     {
-        if (a.cols != b.rows)
+        if (left.data.empty())
+        {
+            throw std::invalid_argument("MatrixOperations::multiply: received empty left matrix");
+        }
+        if (right.data.empty())
+        {
+            throw std::invalid_argument("MatrixOperations::multiply: received empty right matrix");
+        }
+    }
+
+    template <typename T, typename U>
+    void verify_correct_dimension(const seal::util::matrix<T> &left, const seal::util::matrix<U> &right)
+    {
+        if (left.cols != right.rows)
         {
             throw std::invalid_argument("MatrixOperations::multiply: left matrix cols != right matrix rows");
         }
@@ -153,7 +166,7 @@ namespace sealtest
     seal::util::matrix<fractures::CiphertextFracture> multiplyMatrices(
         const seal::util::matrix<fractures::CiphertextFracture> &a, const seal::util::matrix<T> &b)
     {
-        verify_dims(a, b);
+        verify_correct_dimension(a, b);
 
         seal::util::matrix<fractures::CiphertextFracture> result(a.rows, b.cols);
 
@@ -184,40 +197,62 @@ namespace sealtest
         return result;
     }
 
-    template <typename T>
-    seal::util::matrix<Ciphertext> multiplyMatrices(
-        SetupObjs &all, const seal::util::matrix<Ciphertext> &a, const seal::util::matrix<T> &b)
+    template <typename U, typename V>
+    seal::Ciphertext mult_row(
+        const SetupObjs &all, uint64_t i, uint64_t j, const seal::util::matrix<U> &left,
+        const seal::util::matrix<V> &right)
     {
-        verify_dims(a, b);
+        seal::Ciphertext tmp;
+        seal::Ciphertext tmp_result(all.context);
+        tmp_result.is_ntt_form() = true;
 
-        seal::util::matrix<Ciphertext> result(a.rows, b.cols);
-
-        for (std::uint64_t i = 0; i < result.rows; ++i)
+        // assume that in seal::Plaintext case we don't want to turn into splitPlaintexts
+        for (uint64_t k = 0; k < left.cols; ++k)
         {
-            for (std::uint64_t j = 0; j < result.cols; ++j)
+            if constexpr ((std::is_same_v<V, seal::Plaintext>))
             {
-                // create an empty sum variable (using the parameters of a.data[0])
-                seal::Ciphertext sum(all.context);
-                seal::Ciphertext tmp;
-                all.evaluator.transform_to_ntt_inplace(sum);
+                all.evaluator.multiply_plain(left(i, k), right(k, j), tmp);
+            }
+            else if constexpr (std::is_same_v<U, seal::Plaintext>)
+            {
+                all.evaluator.multiply_plain(right(k, j), left(i, k), tmp);
+            }
+            else
+            {
+                all.evaluator.multiply(left(i, k), right(k, j), tmp);
+            }
+            all.evaluator.add(tmp, tmp_result, tmp_result);
+        }
+        return tmp_result;
+    }
 
-                for (std::uint64_t k = 0; k < a.cols; ++k)
-                {
-                    if constexpr ((std::is_same_v<T, seal::Plaintext>))
-                    {
-                        all.evaluator.multiply_plain(a(i, k), b(k, j), tmp);
-                    }
-                    else
-                    {
-                        all.evaluator.multiply(a(i, k), b(k, j), tmp);
-                    }
-                    all.evaluator.add(tmp, sum, sum);
-                }
-
-                result(i, j) = sum;
+    template <typename U, typename V>
+    void mat_mult(
+        const SetupObjs &all, const seal::util::matrix<U> &left, const seal::util::matrix<V> &right,
+        seal::util::matrix<seal::Ciphertext> &result)
+    {
+        for (uint64_t i = 0; i < left.rows; ++i)
+        {
+            for (uint64_t j = 0; j < right.cols; ++j)
+            {
+                result(i, j) = mult_row(all, i, j, left, right);
             }
         }
+    }
 
+    template <typename T, typename U>
+    seal::util::matrix<Ciphertext> multiplyMatrices(
+        SetupObjs &all, const seal::util::matrix<T> &a, const seal::util::matrix<U> &b)
+    {
+        if constexpr (std::is_same_v<T, seal::Plaintext> && std::is_same_v<U, seal::Plaintext>)
+        {
+            throw std::invalid_argument("MatrixOperations::multiply: cannot multiply plaintext by plaintext");
+        }
+        verify_correct_dimension(a, b);
+        verify_not_empty_matrices(a, b);
+
+        seal::util::matrix<Ciphertext> result(a.rows, b.cols);
+        mat_mult(all, a, b, result);
         return result;
     }
 
