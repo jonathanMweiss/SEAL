@@ -436,12 +436,34 @@ namespace sealtest::fracture
 
         TEST(FracturedOps, ptxCtxMultThenCtxMult)
         {
-                ASSERT_TRUE(false);
+            auto all = SetupObjs::New();
+            std::uint64_t num_fractures = 256;
+
+            auto ctx1 = all.random_ciphertext();
+            auto ptx = all.random_ntt_plaintext();
+            auto ctx2 = all.random_ciphertext();
+
+            seal::fractures::CiphertextShredder ctxshred1(ctx1, all.essence, num_fractures);
+            seal::fractures::Polynomial pshred(ptx, all.essence, num_fractures);
+            seal::fractures::CiphertextShredder ctxshred2(ctx2, all.essence, num_fractures);
+
+            for (std::uint64_t i = 0; i < num_fractures; ++i)
+            {
+                ctxshred1[i] *= pshred.get_fracture(i);
+                ctxshred1[i] *= ctxshred2[i];
+            }
+
+            all.evaluator.multiply_plain_inplace(ctx1, ptx);
+            all.evaluator.multiply_inplace(ctx1, ctx2);
+
+            auto result = ctxshred1.into_ciphertext();
+            all.evaluator.sub_inplace(result, ctx1);
+            ASSERT_TRUE(result.is_transparent());
         }
 
         TEST(FracturedOps, ptxMatrixMultWithQueryiesFromLeftAndRight)
         {
-                ASSERT_TRUE(false);
+            ASSERT_TRUE(false);
         }
     } // namespace operations
 
