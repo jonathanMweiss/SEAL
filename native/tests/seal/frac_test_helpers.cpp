@@ -247,4 +247,31 @@ namespace sealtest
         }
         return fractured_matrices;
     }
-}
+
+    vector<util::matrix<fractures::PolynomialFracture>> fracture_matrix(
+        const SetupObjs &all, util::matrix<Plaintext> &ctx_mat, std::uint64_t num_fractures)
+    {
+        // take each ctx and shred it using ctxShredder. then create matrices with the same dims.
+        std::vector<fractures::Polynomial> ptx_shredder;
+        for (auto &ctx_iter : ctx_mat.data)
+        {
+            ptx_shredder.emplace_back(ctx_iter, all.essence, num_fractures);
+        }
+        seal::util::matrix<fractures::Polynomial> shredding(ctx_mat.rows, ctx_mat.cols, ptx_shredder);
+
+        std::vector<seal::util::matrix<fractures::PolynomialFracture>> fractured_matrices;
+        for (std::uint64_t frac_num = 0; frac_num < num_fractures; ++frac_num)
+        {
+            std::vector<fractures::PolynomialFracture> tmp;
+            for (std::uint64_t row = 0; row < ctx_mat.rows; ++row)
+            {
+                for (std::uint64_t col = 0; col < ctx_mat.cols; ++col)
+                {
+                    tmp.push_back(std::move(shredding(row, col)[frac_num]));
+                }
+            }
+            fractured_matrices.emplace_back(ctx_mat.rows, ctx_mat.cols, tmp);
+        }
+        return fractured_matrices;
+    }
+} // namespace sealtest
