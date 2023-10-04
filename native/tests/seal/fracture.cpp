@@ -463,7 +463,32 @@ namespace sealtest::fracture
 
         TEST(FracturedOps, ptxMatrixMultWithQueryiesFromLeftAndRight)
         {
-            ASSERT_TRUE(false);
+            auto all = SetupObjs::New();
+            std::uint64_t r = 1, c = 1;
+            seal::util::matrix<Plaintext> pt_mat(r, c, random_ptxs(all, int(r * c)));
+            seal::util::matrix<Ciphertext> ctx_vec_right(c, 1, random_ctx_vector(all, int(c)));
+            seal::util::matrix<Ciphertext> ctx_vec_left(1, r, random_ctx_vector(all, int(r)));
+
+            auto tmp = multiplyMatrices(all, ctx_vec_left, pt_mat);
+            auto expected = multiplyMatrices(all, tmp, ctx_vec_right);
+
+            std::uint64_t num_fractures = 256;
+
+            auto shred_ptxs = fracture_matrix(all, pt_mat, num_fractures);
+            auto shred_left = fracture_matrix(all, ctx_vec_left, num_fractures);
+            auto shred_right = fracture_matrix(all, ctx_vec_right, num_fractures);
+
+            seal::fractures::CiphertextShredder collect_resulting_ctx(all.essence, num_fractures);
+            for (std::uint64_t i = 0; i < num_fractures; ++i)
+            {
+                auto tmp_ = multiplyMatrices(shred_left[i], shred_ptxs[i]);
+                auto result_frac_i_in_mat_form = multiplyMatrices(tmp_, shred_right[i]);
+                collect_resulting_ctx.set_fracture(i, result_frac_i_in_mat_form(0, 0));
+            }
+
+            auto mat_mul_result = collect_resulting_ctx.into_ciphertext();
+            all.evaluator.sub_inplace(expected(0, 0), mat_mul_result);
+            ASSERT_TRUE(mat_mul_result.is_transparent());
         }
     } // namespace operations
 
