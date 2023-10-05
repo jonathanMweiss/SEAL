@@ -162,23 +162,39 @@ namespace sealtest
     }
 
     // Doing matmul...
-    template <typename T>
+    template <typename U, typename T>
     seal::util::matrix<fractures::CiphertextFracture> multiplyMatrices(
-        const seal::util::matrix<fractures::CiphertextFracture> &a, const seal::util::matrix<T> &b)
+        const seal::util::matrix<U> &a, const seal::util::matrix<T> &b)
     {
+        if constexpr ((std::is_same_v<T, seal::Plaintext>)&&std::is_same_v<U, seal::Plaintext>)
+        {
+            throw std::invalid_argument("MatrixOperations::multiply: cannot multiply ptx by ptx");
+        }
         verify_correct_dimension(a, b);
 
         seal::util::matrix<fractures::CiphertextFracture> result(a.rows, b.cols);
 
         std::uint64_t poly_sz = 2;
-        if constexpr ((std::is_same_v<T, seal::fractures::CiphertextFracture>))
+
+        if constexpr ((std::is_same_v<T, seal::fractures::CiphertextFracture>)&&std::is_same_v<
+                          U, seal::fractures::CiphertextFracture>)
         {
             poly_sz = 3;
         }
 
-        auto index = a(0, 0).index;
-        auto coeff_modulus = a(0, 0).coeff_modulus;
-        auto coeff_count = a(0, 0).poly_fracs[0].coeff_count;
+        const fractures::CiphertextFracture *ctx;
+        if constexpr (std::is_same_v<T, seal::fractures::CiphertextFracture>)
+        {
+            ctx = &b(0, 0);
+        }
+        else
+        {
+            ctx = &a(0, 0);
+        }
+
+        auto index = ctx->index;
+        auto coeff_modulus = ctx->coeff_modulus;
+        auto coeff_count = ctx->poly_fracs[0].coeff_count;
 
         for (std::uint64_t i = 0; i < result.rows; ++i)
         {

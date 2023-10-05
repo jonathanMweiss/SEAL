@@ -461,9 +461,42 @@ namespace sealtest::fracture
             ASSERT_TRUE(result.is_transparent());
         }
 
-        TEST(FracturedOps, ptxMatrixMultWithQueryiesFromLeftAndRight)
+        /**
+         * This is the final test for fracture update. Ensuring we can safely perform a fractured PIR query.
+         * Assume the fractures are split across 256 machines, where the ctxs are changing once every x minutes (e.g.,
+         *  10 < x < 30).
+         */
+        TEST(FracturedOps, PIRQuery)
         {
-            ASSERT_TRUE(false);
+            auto all = SetupObjs::New();
+            std::uint64_t vec_size = 20;
+
+            seal::util::matrix<Ciphertext> query_right(vec_size, 1, random_ctx_vector(all, int(vec_size)));
+            seal::util::matrix<Ciphertext> query_left(1, vec_size, random_ctx_vector(all, int(vec_size)));
+
+            seal::util::matrix<Plaintext> db(vec_size, vec_size, random_ptxs(all, int(vec_size * vec_size)));
+
+            auto ctx_vector = multiplyMatrices(all, db, query_right);
+            auto response = multiplyMatrices(all, query_left, ctx_vector);
+
+            // fracture:
+            std::uint64_t num_fractures = 256;
+            auto frac_query_right = fracture_matrix(all, query_right, num_fractures);
+            auto frac_query_left = fracture_matrix(all, query_left, num_fractures);
+            auto frac_db = fracture_matrix(all, db, num_fractures);
+
+            // multiply:
+            seal::fractures::CiphertextShredder composit(all.essence, num_fractures);
+            for (std::uint64_t i = 0; i < num_fractures; ++i)
+            {
+                auto frac_ctx_vector = multiplyMatrices(frac_db[i], frac_query_right[i]);
+                auto frac_response = multiplyMatrices(frac_query_left[i], frac_ctx_vector);
+                composit.set_fracture(i, frac_response(0, 0));
+            }
+
+            // compare:
+            all.evaluator.sub_inplace(response(0, 0), composit.into_ciphertext());
+            ASSERT_TRUE(response(0, 0).is_transparent());
         }
     } // namespace operations
 
