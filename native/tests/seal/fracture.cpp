@@ -9,6 +9,7 @@
 #include "seal/fractured_ciphertext.h"
 #include "seal/fractured_polynomial.h"
 #include "seal/keygenerator.h"
+#include "seal/matmul.hpp"
 #include "seal/modulus.h"
 #include "seal/poly_eval.h"
 #include <cstddef>
@@ -392,7 +393,7 @@ namespace sealtest::fracture
             seal::fractures::CiphertextShredder result(all.essence, num_fractures);
             for (std::uint64_t i = 0; i < num_fractures; ++i)
             {
-                auto tmp = multiplyMatrices(shred_left[i], shred_right[i]);
+                auto tmp = multiply_matrices(shred_left[i], shred_right[i]);
                 ASSERT_TRUE(tmp.cols == 1 && tmp.rows == 1);
                 result.set_fracture(i, tmp(0, 0));
             }
@@ -489,8 +490,8 @@ namespace sealtest::fracture
             seal::fractures::CiphertextShredder composit(all.essence, num_fractures);
             for (std::uint64_t i = 0; i < num_fractures; ++i)
             {
-                auto frac_ctx_vector = multiplyMatrices(frac_db[i], frac_query_right[i]);
-                auto frac_response = multiplyMatrices(frac_query_left[i], frac_ctx_vector);
+                auto frac_ctx_vector = multiply_matrices(frac_db[i], frac_query_right[i]);
+                auto frac_response = multiply_matrices(frac_query_left[i], frac_ctx_vector);
                 composit.set_fracture(i, frac_response(0, 0));
             }
 
