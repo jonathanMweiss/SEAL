@@ -33,7 +33,6 @@ namespace seal::util
             data.resize(rows * cols);
         };
 
-
         [[nodiscard]] inline std::uint64_t pos(std::uint64_t row, std::uint64_t col) const
         {
             return row + col * rows;
@@ -69,4 +68,4 @@ namespace seal::util
             return rows * cols;
         }
     };
-} // namespace
+} // namespace seal::util
