@@ -53,6 +53,10 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/valcheck.h
         ${CMAKE_CURRENT_LIST_DIR}/version.h
         ${CMAKE_CURRENT_LIST_DIR}/matrix.h
+        ${CMAKE_CURRENT_LIST_DIR}/matmul.hpp
+        ${CMAKE_CURRENT_LIST_DIR}/fractured_ciphertext.h
+        ${CMAKE_CURRENT_LIST_DIR}/fractured_polynomial.h
+        ${CMAKE_CURRENT_LIST_DIR}/fractured_rns.h
         ${CMAKE_CURRENT_LIST_DIR}/fractured_rns.h
         ${CMAKE_CURRENT_LIST_DIR}/fractured_polynomial.h
         ${CMAKE_CURRENT_LIST_DIR}/fractured_ciphertext.h
