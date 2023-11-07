@@ -37,13 +37,16 @@ namespace sealtest
          * @param logt
          * @return
          */
-        static SetupObjs New(std::uint64_t N = 4096, int logt = 16)
+        static SetupObjs New(std::uint64_t N = 4096 * 2, int logt = 16)
         {
             seal::EncryptionParameters enc(seal::scheme_type::bgv);
 
             enc.set_poly_modulus_degree(N);
+            //                        enc.set_coeff_modulus(seal::CoeffModulus::BFVDefault(N,sec_level_type::tc192));
 
-            auto tmp = std::vector<int>{ 34,34,41 };
+            //            152 = 4 * 38
+
+            auto tmp = std::vector<int>{ 22, 26, 48, 56 };
             auto o = seal::CoeffModulus::Create(N, tmp);
             enc.set_coeff_modulus(o);
             enc.set_plain_modulus(seal::PlainModulus::Batching(N, logt + 1));
@@ -54,7 +57,16 @@ namespace sealtest
         explicit SetupObjs(seal::EncryptionParameters encryption_params)
             : enc_params(std::move(encryption_params)), context(enc_params, true), essence(context, enc_params),
               evaluator(context), keygen(context), secret_key(keygen.secret_key()), encryptor(context, secret_key),
-              decryptor(context, secret_key){};
+              decryptor(context, secret_key)
+        {
+            std::cout << " crypto modolous: ";
+            for (auto i : essence.parms.coeff_modulus())
+            {
+                std::cout << i.value() << ", ";
+            }
+
+            std::cout << std::endl;
+        };
 
         seal::Plaintext random_plaintext() const
         {

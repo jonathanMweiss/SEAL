@@ -158,10 +158,6 @@ namespace sealtest::fracture
         TEST(FracturedOps, MultPlain)
         {
             auto all = SetupObjs::New();
-            for (auto i : all.essence.parms.coeff_modulus())
-            {
-                std::cout << i.value() << std::endl;
-            }
             std::uint64_t num_fractures = 256;
 
             seal::Ciphertext encrypted_ntt = all.random_ciphertext();
@@ -215,22 +211,24 @@ namespace sealtest::fracture
                 std::cout << i.value() << std::endl;
             }
 
-            seal::Plaintext p(all.enc_params.poly_modulus_degree());
+            auto ptx = all.random_ntt_plaintext();
+            auto ctx1 = all.random_ciphertext();
+//            seal::Plaintext p(all.enc_params.poly_modulus_degree());
 
-            for (std::uint64_t i = 0; i < all.enc_params.poly_modulus_degree(); ++i)
-            {
-                p[i] = 0;
-            }
-            p[0] = 5;
+//            for (std::uint64_t i = 0; i < all.enc_params.poly_modulus_degree(); ++i)
+//            {
+//                p[i] = 0;
+//            }
+//            p[0] = 5;
 
-            seal::Ciphertext ctx1;
-            all.encryptor.encrypt_symmetric(p, ctx1);
-
+//            seal::Ciphertext ctx1;
+//            all.encryptor.encrypt_symmetric(p, ctx1);
+            all.evaluator.multiply_plain_inplace(ctx1, ptx);
             all.evaluator.multiply_inplace(ctx1, ctx1);
 
-            all.decryptor.decrypt(ctx1, p);
+//            all.decryptor.decrypt(ctx1, p);
             std::cout << "=====" << std::endl;
-            std::cout << p[0] << std::endl;
+//            std::cout << p[0] << std::endl;
             std::cout << all.decryptor.invariant_noise_budget(ctx1) << std::endl;
             ASSERT_TRUE(all.decryptor.invariant_noise_budget(ctx1) > 0);
         }
@@ -502,6 +500,8 @@ namespace sealtest::fracture
         TEST(FracturedOps, PIRQuery)
         {
             auto all = SetupObjs::New();
+
+
             std::uint64_t vec_size = 20;
 
             seal::util::matrix<Ciphertext> query_right(vec_size, 1, random_ctx_vector(all, int(vec_size)));
@@ -530,6 +530,8 @@ namespace sealtest::fracture
             // compare:
             all.evaluator.sub_inplace(response(0, 0), composit.into_ciphertext());
             ASSERT_TRUE(response(0, 0).is_transparent());
+            std::cout<< "Noise budget: " << all.decryptor.invariant_noise_budget(response(0, 0)) << std::endl;
+            ASSERT_TRUE(all.decryptor.invariant_noise_budget(response(0, 0)) > 0);
         }
     } // namespace operations
 
