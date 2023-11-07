@@ -31,12 +31,21 @@ namespace sealtest
         seal::Encryptor encryptor;
         seal::Decryptor decryptor;
 
-        static SetupObjs New(std::uint64_t N = 4096 * 2, int logt = 20)
+        /**
+         * The following parameters are chosen to support ctx-ctx multiplication and still have budget left.
+         * @param N
+         * @param logt
+         * @return
+         */
+        static SetupObjs New(std::uint64_t N = 4096, int logt = 16)
         {
             seal::EncryptionParameters enc(seal::scheme_type::bgv);
 
             enc.set_poly_modulus_degree(N);
-            enc.set_coeff_modulus(seal::CoeffModulus::BFVDefault(N));
+
+            auto tmp = std::vector<int>{ 34,34,41 };
+            auto o = seal::CoeffModulus::Create(N, tmp);
+            enc.set_coeff_modulus(o);
             enc.set_plain_modulus(seal::PlainModulus::Batching(N, logt + 1));
 
             return SetupObjs(enc);
@@ -90,6 +99,12 @@ namespace sealtest
             auto ptx = random_plaintext();
             seal::Ciphertext ctx;
             encryptor.encrypt_symmetric(ptx, ctx);
+            if (ctx.is_ntt_form())
+            {
+                return ctx;
+            }
+
+            evaluator.transform_to_ntt_inplace(ctx);
             return ctx;
         }
 

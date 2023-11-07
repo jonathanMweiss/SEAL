@@ -28,7 +28,7 @@ namespace sealtest::fracture
 
     TEST(PolyEvaluate, PtxIsScalar)
     {
-        auto all = SetupObjs::New(1 << 12);
+        auto all = SetupObjs::New();
         seal::fractures::PolynomialEvaluator pe(all.essence);
 
         for (int i = 0; i < 10; ++i)
@@ -60,7 +60,7 @@ namespace sealtest::fracture
     {
         // TODO: maybe im not getting the right value?
         //   it seems to work when RNS-size ==1.
-        auto all = SetupObjs::New(1 << 11);
+        auto all = SetupObjs::New();
         seal::fractures::PolynomialEvaluator pe(all.essence);
         auto prng = all.prng();
 
@@ -95,7 +95,7 @@ namespace sealtest::fracture
 
     TEST(PolyEvaluate, ctxAddCtx)
     {
-        auto all = SetupObjs::New(1 << 10);
+        auto all = SetupObjs::New();
         seal::fractures::PolynomialEvaluator pe(all.essence);
 
         //        for (int i = 0; i < 500; ++i)
@@ -131,7 +131,7 @@ namespace sealtest::fracture
     {
         TEST(FracturedOps, PolyEvalEquals)
         {
-            auto all = SetupObjs::New(1 << 12);
+            auto all = SetupObjs::New();
             seal::fractures::PolynomialEvaluator pe(all.essence);
 
             auto ptx = all.random_plaintext();
@@ -158,6 +158,10 @@ namespace sealtest::fracture
         TEST(FracturedOps, MultPlain)
         {
             auto all = SetupObjs::New();
+            for (auto i : all.essence.parms.coeff_modulus())
+            {
+                std::cout << i.value() << std::endl;
+            }
             std::uint64_t num_fractures = 256;
 
             seal::Ciphertext encrypted_ntt = all.random_ciphertext();
@@ -201,6 +205,34 @@ namespace sealtest::fracture
 
             all.evaluator.sub_inplace(ctx1, ctxshred1.into_ciphertext());
             ASSERT_TRUE(ctx1.is_transparent());
+        }
+
+        TEST(FracturedOps, ctxSize3Budget)
+        {
+            auto all = SetupObjs::New();
+            for (auto i : all.essence.parms.coeff_modulus())
+            {
+                std::cout << i.value() << std::endl;
+            }
+
+            seal::Plaintext p(all.enc_params.poly_modulus_degree());
+
+            for (std::uint64_t i = 0; i < all.enc_params.poly_modulus_degree(); ++i)
+            {
+                p[i] = 0;
+            }
+            p[0] = 5;
+
+            seal::Ciphertext ctx1;
+            all.encryptor.encrypt_symmetric(p, ctx1);
+
+            all.evaluator.multiply_inplace(ctx1, ctx1);
+
+            all.decryptor.decrypt(ctx1, p);
+            std::cout << "=====" << std::endl;
+            std::cout << p[0] << std::endl;
+            std::cout << all.decryptor.invariant_noise_budget(ctx1) << std::endl;
+            ASSERT_TRUE(all.decryptor.invariant_noise_budget(ctx1) > 0);
         }
 
         TEST(FracturedOps, addCtxSize3)
