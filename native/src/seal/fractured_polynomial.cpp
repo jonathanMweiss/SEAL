@@ -119,6 +119,14 @@ namespace seal::fractures
         {
             return false;
         }
+        if (coeff_count != other.coeff_count)
+        {
+            return false;
+        }
+        if (fracture_index != other.fracture_index)
+        {
+            return false;
+        }
 
         for (std::uint64_t j = 0; j < rns_coefficients.data.size(); ++j)
         {
@@ -192,15 +200,19 @@ namespace seal::fractures
         auto old_except_mask = stream.exceptions();
         try
         {
-            stream.read(reinterpret_cast<char *>(&this->rns_coefficients.rows), sizeof(uint64_t));
-            stream.read(reinterpret_cast<char *>(&this->rns_coefficients.cols), sizeof(uint64_t));
-            stream.read(reinterpret_cast<char *>(&this->fracture_index), sizeof(uint64_t));
+            std::uint64_t rows;
+            std::uint64_t cols;
+            std::uint64_t index;
 
-            auto rows = this->rns_coefficients.rows;
-            auto cols = this->rns_coefficients.cols;
+            stream.read(reinterpret_cast<char *>(&rows), sizeof(uint64_t));
+            stream.read(reinterpret_cast<char *>(&cols), sizeof(uint64_t));
+            stream.read(reinterpret_cast<char *>(&index), sizeof(uint64_t));
 
-            this->rns_coefficients =
-                seal::util::matrix<std::uint64_t>(this->rns_coefficients.rows, this->rns_coefficients.cols);
+            this->coeff_count = rows;
+            this->fracture_index = index;
+
+            this->rns_coefficients = seal::util::matrix<std::uint64_t>(rows, cols);
+
             stream.read(
                 reinterpret_cast<char *>(&this->rns_coefficients.data[0]),
                 static_cast<long>(rows * cols * sizeof(std::uint64_t)));

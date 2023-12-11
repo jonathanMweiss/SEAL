@@ -39,17 +39,23 @@ namespace sealtest
          */
         static SetupObjs New(std::uint64_t N = 4096 * 2, int logt = 16)
         {
+
             seal::EncryptionParameters enc(seal::scheme_type::bgv);
 
             enc.set_poly_modulus_degree(N);
-            //                        enc.set_coeff_modulus(seal::CoeffModulus::BFVDefault(N,sec_level_type::tc192));
+//            enc.set_coeff_modulus(seal::CoeffModulus::BFVDefault(N, sec_level_type::tc192));
 
-            //            152 = 4 * 38
-
-            auto tmp = std::vector<int>{ 22, 26, 48, 56 };
+            auto tmp = std::vector<int>{ 54, 41, 42 };
             auto o = seal::CoeffModulus::Create(N, tmp);
             enc.set_coeff_modulus(o);
             enc.set_plain_modulus(seal::PlainModulus::Batching(N, logt + 1));
+            // 218 is 128-bit secure.
+            // 152 is 192-bit secure.
+            //            auto tmp = std::vector<int>{ 54, 50,40};
+//            auto tmp = std::vector<int>{ 54, 41, 42 };
+//            auto o = seal::CoeffModulus::Create(N, tmp);
+//            enc.set_coeff_modulus(o);
+//            enc.set_plain_modulus(seal::PlainModulus::Batching(N, logt + 1));
 
             return SetupObjs(enc);
         }
