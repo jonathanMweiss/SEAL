@@ -564,6 +564,33 @@ namespace sealtest::fracture
             ASSERT_TRUE(pf3 == pf);
         }
 
+        TEST(FracturedOps, serializeSparsePtx)
+        {
+            auto all = SetupObjs::New();
+
+            auto ptx = all.random_ntt_plaintext();
+            for (unsigned long i = 0; i < ptx.coeff_count(); ++i)
+            {
+                ptx[i] = i % 256;
+            }
+            for (uint64_t i = 4; i <= 1024; i = i * 2)
+            {
+                seal::fractures::Polynomial pshredder1(ptx, all.essence, i);
+
+                for (uint64_t frac = 0; frac < i; ++frac)
+                {
+                    auto pf = pshredder1[frac];
+                    stringstream stream;
+                    pf.save(stream);
+
+                    fractures::PolynomialFracture pf2(frac, 0, all.essence.parms.coeff_modulus().size());
+                    auto st = stream.str();
+                    pf2.load((seal::seal_byte *)&st[0], stream.str().length());
+                    ASSERT_TRUE(pf2 == pf);
+                }
+            }
+        }
+
         TEST(FracturedOps, serializeTestSizes)
         {
             auto all = SetupObjs::New();
