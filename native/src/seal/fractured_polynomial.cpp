@@ -1,6 +1,6 @@
 #include "fractured_polynomial.h"
 #include "fractured_ciphertext.h"
-
+#include "defines.h"
 namespace seal::fractures
 {
 
@@ -13,7 +13,7 @@ namespace seal::fractures
         std::uint64_t rns_num = 0;
         // We run up to modulus_size-1 because the inner loop moves from first position to the end.
         // for example, when mudulus_size==1, we move from 0 and up to 1,  thus we go through the whole range.
-        std::for_each_n(seal::util::iter(rns_iter), modulus_size - 1, [&](auto coef_iter) {
+        SEAL_ITERATE(seal::util::iter(rns_iter), modulus_size - 1, [&](auto coef_iter) {
             coef_iter += index * num_coeffs / num_fractures;
             auto write_into_iter = fracture.rns_poly_iter(rns_num);
             for (uint64_t j = 0; j < num_coeffs / num_fractures; ++j)

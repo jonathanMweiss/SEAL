@@ -1,4 +1,5 @@
 #include "fractured_ciphertext.h"
+#include "defines.h"
 #include <utility>
 
 namespace seal::fractures
@@ -13,7 +14,7 @@ namespace seal::fractures
         std::vector<Polynomial> poly_shredders;
         poly_shredders.reserve(ctx.size());
 
-        std::for_each_n(seal::util::ConstPolyIter(ctx), ctx.size(), [&](seal::util::ConstRNSIter rns_iter_per_poly) {
+        SEAL_ITERATE(seal::util::ConstPolyIter(ctx), ctx.size(), [&](seal::util::ConstRNSIter rns_iter_per_poly) {
             poly_shredders.emplace_back(rns_iter_per_poly, e, num_fractures);
         });
 
@@ -43,7 +44,7 @@ namespace seal::fractures
         ctx.is_ntt_form() = true;
 
         auto poly_iter_num = -1;
-        std::for_each_n(seal::util::PolyIter(ctx), ctx.size(), [&](seal::util::RNSIter p_i) {
+        SEAL_ITERATE(seal::util::PolyIter(ctx), ctx.size(), [&](seal::util::RNSIter p_i) {
             poly_iter_num++;
 
             auto poly_modulus_degree = p_i.poly_modulus_degree();
@@ -53,7 +54,7 @@ namespace seal::fractures
                 auto rns_iter_num = -1;
                 // because of RNS we perform this for-each. (coeff_modulus_size elements per "coef")
                 // We go up to -1 because the inner loop will go through the last element
-                std::for_each_n(iter(p_i), ctx_parts[0].coeff_modulus.size() - 1, [&](seal::util::CoeffIter write_to) {
+                SEAL_ITERATE(iter(p_i), ctx_parts[0].coeff_modulus.size() - 1, [&](seal::util::CoeffIter write_to) {
                     rns_iter_num++;
 
                     write_to += i * fracture_size;

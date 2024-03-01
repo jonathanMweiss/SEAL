@@ -46,7 +46,7 @@ namespace seal::fractures
         std::vector<std::uint64_t> result_vec(coeff_modulus_size);
 
         uint64_t i = 0;
-        std::for_each_n(seal::util::iter(rns_iter), coeff_modulus_size, [&](auto coef_iter) {
+        SEAL_ITERATE(seal::util::iter(rns_iter), coeff_modulus_size, [&](auto coef_iter) {
             auto mod = coeff_modulus[i];
 
             uint64_t x = 1;
@@ -85,7 +85,7 @@ namespace seal::fractures
         auto result = seal::fractures::EvaluatedCipherPoint::Empty(ctx.size(), 0, 0, coeff_modulus);
 
         std::uint64_t i = 0;
-        std::for_each_n(seal::util::ConstPolyIter(ctx), ctx.size(), [&](seal::util::ConstRNSIter iter) {
+        SEAL_ITERATE(seal::util::ConstPolyIter(ctx), ctx.size(), [&](seal::util::ConstRNSIter iter) {
             result.poly_fracs[i] = evalute(iter, value);
             i++;
         });
