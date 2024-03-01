@@ -1,6 +1,6 @@
 #include "fractured_polynomial.h"
 #include "fractured_ciphertext.h"
-#include "defines.h"
+
 namespace seal::fractures
 {
 

@@ -1,5 +1,4 @@
 #include "fractured_ciphertext.h"
-#include "defines.h"
 #include <utility>
 
 namespace seal::fractures
