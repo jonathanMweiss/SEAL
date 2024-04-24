@@ -331,7 +331,8 @@ namespace seal
             // Dereferencing creates NTTTables and returns by value
             inline value_type operator*() const
             {
-                return { coeff_count_power_, modulus_[index_], pool_ };
+                return { coeff_count_power_, modulus_[index_],
+                         pool_ }; // TODO: you add to this guy the type of ntt handler you need.
             }
 
             // Pre-increment

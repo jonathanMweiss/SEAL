@@ -20,5 +20,12 @@ namespace seal::fractures
     private:
         Essence essence;
         EvaluatedPoint evalute(seal::util::ConstRNSIter rns_iter, const std::vector<std::uint64_t> &value) const;
+
+        EvaluatedPoint evalute(
+            seal::util::ConstRNSIter rns_iter, const std::vector<seal::Modulus> &modulus,
+            const std::vector<std::uint64_t> &value) const;
+
+        static void validate_value_to_evaluate(
+            const std::vector<std::uint64_t> &value, const std::vector<Modulus> &coeff_modulus);
     };
 } // namespace seal::fractures

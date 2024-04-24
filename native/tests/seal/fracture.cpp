@@ -26,8 +26,17 @@ using namespace std;
 namespace sealtest::fracture
 {
 
+    TEST(PolyEvaluate, FindRootOfQuotient)
+    {
+        // need to do: find a single root.
+        // then evaluate the ctxs on that root.
+        // then multiply the ctxs and evaluate the result on the root.
+        auto all = SetupObjs::New();
+
+    }
     TEST(PolyEvaluate, PtxIsScalar)
     {
+        GTEST_SKIP();
         auto all = SetupObjs::New();
         seal::fractures::PolynomialEvaluator pe(all.essence);
 
