@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <ctime>
+#include <fstream>
 #include <string>
 #include <utility>
 #include "gtest/gtest.h"
@@ -39,11 +40,10 @@ namespace sealtest
          */
         static SetupObjs New(std::uint64_t N = 4096 * 2, int logt = 16)
         {
-
             seal::EncryptionParameters enc(seal::scheme_type::bgv);
 
             enc.set_poly_modulus_degree(N);
-//            enc.set_coeff_modulus(seal::CoeffModulus::BFVDefault(N, sec_level_type::tc192));
+            //            enc.set_coeff_modulus(seal::CoeffModulus::BFVDefault(N, sec_level_type::tc192));
 
             auto tmp = std::vector<int>{ 54, 41, 42 };
             auto o = seal::CoeffModulus::Create(N, tmp);
@@ -52,10 +52,10 @@ namespace sealtest
             // 218 is 128-bit secure.
             // 152 is 192-bit secure.
             //            auto tmp = std::vector<int>{ 54, 50,40};
-//            auto tmp = std::vector<int>{ 54, 41, 42 };
-//            auto o = seal::CoeffModulus::Create(N, tmp);
-//            enc.set_coeff_modulus(o);
-//            enc.set_plain_modulus(seal::PlainModulus::Batching(N, logt + 1));
+            //            auto tmp = std::vector<int>{ 54, 41, 42 };
+            //            auto o = seal::CoeffModulus::Create(N, tmp);
+            //            enc.set_coeff_modulus(o);
+            //            enc.set_plain_modulus(seal::PlainModulus::Batching(N, logt + 1));
 
             return SetupObjs(enc);
         }
@@ -283,4 +283,48 @@ namespace sealtest
         }
         return fractured_matrices;
     }
+
+    void ctx_to_json(std::stringstream &ss, const SetupObjs &all, const seal::Ciphertext &ctx)
+    {
+        //        auto &ss = std::cout;
+        ss << "{" << std::endl;
+
+        auto modulus = all.essence.parms.coeff_modulus();
+        std::uint64_t poly_number = 0;
+        SEAL_ITERATE(seal::util::ConstPolyIter(ctx), ctx.size(), [&](seal::util::ConstRNSIter rns_iter_per_poly) {
+            std::uint64_t rns_number = 0;
+            ss << "\""
+               << "poly" << poly_number++ << "\":{";
+            SEAL_ITERATE(seal::util::iter(rns_iter_per_poly), modulus.size(), [&](auto coef_iter) {
+                ss << "\"" << modulus[rns_number++].value() << "\":[";
+                if (poly_number ==3){
+                    std:cout<<"";
+                }
+                for (uint64_t j = 0; j < all.essence.parms.poly_modulus_degree(); ++j)
+                {
+                    ss << *coef_iter << ",";
+                    coef_iter++;
+                }
+                ss << "]," << std::endl;
+            });
+            ss << "}," << std::endl;
+        });
+        ss << "}" << std::endl;
+    }
+
+    void ctx_json_into_file(std::stringstream &ss, const std::string &filename)
+    {
+        //        code that dumps all contents of string stream into a file:
+        std::ofstream out(filename);
+        out << ss.str();
+        out.close();
+    }
+
+    void ctx_into_file(const SetupObjs &all, const seal::Ciphertext &ctx, const std::string &filename)
+    {
+        std::stringstream ss;
+        ctx_to_json(ss, all, ctx);
+        ctx_json_into_file(ss, filename);
+    }
+
 } // namespace sealtest
