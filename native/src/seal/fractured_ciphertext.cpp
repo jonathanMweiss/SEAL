@@ -3,72 +3,24 @@
 
 namespace seal::fractures
 {
-    CiphertextShredder::CiphertextShredder(Essence e, std::uint64_t num_fractures) noexcept
-        : essence(std::move(e)), ctx_parts(num_fractures)
+    CiphertextShredder::CiphertextShredder(const seal::SEALContext &cntx, std::uint64_t num_fractures) noexcept
+        : context(cntx), ctx_parts(num_fractures)
     {}
 
-    CiphertextShredder::CiphertextShredder(const seal::Ciphertext &ctx, Essence e, std::uint64_t num_fractures) noexcept
-        : essence(e)
+    CiphertextShredder::CiphertextShredder(
+        const seal::Ciphertext &ctx, const seal::SEALContext &cntx, std::uint64_t num_fractures) noexcept
+        : context(cntx)
     {
-        std::vector<Polynomial> poly_shredders;
-        poly_shredders.reserve(ctx.size());
-
-        SEAL_ITERATE(seal::util::ConstPolyIter(ctx), ctx.size(), [&](seal::util::ConstRNSIter rns_iter_per_poly) {
-            poly_shredders.emplace_back(rns_iter_per_poly, e, num_fractures);
-        });
-
         ctx_parts.reserve(num_fractures);
-
         for (std::uint64_t i = 0; i < num_fractures; ++i)
         {
-            CiphertextFracture fracture{ {}, i, essence.parms.coeff_modulus() };
-
-            fracture.poly_fracs.reserve(ctx.size());
-
-            for (std::uint64_t j = 0; j < ctx.size(); ++j)
-            {
-                fracture.poly_fracs.push_back(poly_shredders[j].get_fracture(i));
-            }
-
-            ctx_parts.push_back(fracture);
+            ctx_parts.push_back(CiphertextFracturingTool::compute_fracture(ctx, context, num_fractures, i));
         }
     }
 
     seal::Ciphertext CiphertextShredder::into_ciphertext() const
     {
-        auto num_fractures = ctx_parts.size();
-
-        seal::Ciphertext ctx(essence.parms);
-        ctx.resize(ctx_parts[0].poly_fracs.size());
-        ctx.is_ntt_form() = true;
-
-        auto poly_iter_num = -1;
-        SEAL_ITERATE(seal::util::PolyIter(ctx), ctx.size(), [&](seal::util::RNSIter p_i) {
-            poly_iter_num++;
-
-            auto poly_modulus_degree = p_i.poly_modulus_degree();
-            auto fracture_size = poly_modulus_degree / num_fractures;
-            for (std::uint64_t i = 0; i < num_fractures; ++i)
-            {
-                auto rns_iter_num = -1;
-                // because of RNS we perform this for-each. (coeff_modulus_size elements per "coef")
-                // We go up to -1 because the inner loop will go through the last element
-                SEAL_ITERATE(iter(p_i), ctx_parts[0].coeff_modulus.size() - 1, [&](seal::util::CoeffIter write_to) {
-                    rns_iter_num++;
-
-                    write_to += i * fracture_size;
-                    auto read_from = ctx_parts[i].poly_fracs[poly_iter_num].const_rns_poly_iter(rns_iter_num);
-                    for (std::uint64_t j = 0; j < fracture_size; ++j)
-                    {
-                        *write_to = *read_from;
-                        write_to++;
-                        read_from++;
-                    }
-                });
-            }
-        });
-
-        return ctx;
+        return CiphertextBuilderTool::into_ciphertext(ctx_parts, context);
     }
 
     uint64_t CiphertextShredder::num_fractures()

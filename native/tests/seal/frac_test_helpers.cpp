@@ -25,7 +25,6 @@ namespace sealtest
     {
         seal::EncryptionParameters enc_params;
         seal::SEALContext context;
-        seal::fractures::Essence essence;
         seal::Evaluator evaluator;
         seal::KeyGenerator keygen;
         seal::SecretKey secret_key;
@@ -61,18 +60,8 @@ namespace sealtest
         }
 
         explicit SetupObjs(seal::EncryptionParameters encryption_params)
-            : enc_params(std::move(encryption_params)), context(enc_params, true), essence(context, enc_params),
-              evaluator(context), keygen(context), secret_key(keygen.secret_key()), encryptor(context, secret_key),
-              decryptor(context, secret_key)
-        {
-            std::cout << " crypto modolous: ";
-            for (auto i : essence.parms.coeff_modulus())
-            {
-                std::cout << i.value() << ", ";
-            }
-
-            std::cout << std::endl;
-        };
+            : enc_params(std::move(encryption_params)), context(enc_params, true), evaluator(context), keygen(context),
+              secret_key(keygen.secret_key()), encryptor(context, secret_key), decryptor(context, secret_key){};
 
         seal::Plaintext random_plaintext() const
         {
@@ -104,7 +93,7 @@ namespace sealtest
         seal::Plaintext random_ntt_plaintext() const
         {
             auto p = random_plaintext();
-            auto pid = essence.ctx.first_parms_id();
+            auto pid = context.first_parms_id();
 
             evaluator.plain_to_coeff_space(p, pid);
             evaluator.transform_plain_in_coeff_space_to_ntt_inplace(p, pid);
@@ -237,7 +226,7 @@ namespace sealtest
         std::vector<fractures::CiphertextShredder> ctx_shredders;
         for (auto &ctx_iter : ctx_mat.data)
         {
-            ctx_shredders.emplace_back(ctx_iter, all.essence, num_fractures);
+            ctx_shredders.emplace_back(ctx_iter, all.context, num_fractures);
         }
         seal::util::matrix<fractures::CiphertextShredder> shredding(ctx_mat.rows, ctx_mat.cols, ctx_shredders);
 
@@ -264,7 +253,7 @@ namespace sealtest
         std::vector<fractures::Polynomial> ptx_shredder;
         for (auto &ctx_iter : ctx_mat.data)
         {
-            ptx_shredder.emplace_back(ctx_iter, all.essence, num_fractures);
+            ptx_shredder.emplace_back(ctx_iter, all.context, num_fractures);
         }
         seal::util::matrix<fractures::Polynomial> shredding(ctx_mat.rows, ctx_mat.cols, ptx_shredder);
 
@@ -289,7 +278,7 @@ namespace sealtest
         //        auto &ss = std::cout;
         ss << "{" << std::endl;
 
-        auto modulus = all.essence.parms.coeff_modulus();
+        auto modulus = all.context.first_context_data()->parms().coeff_modulus();
         std::uint64_t poly_number = 0;
         SEAL_ITERATE(seal::util::ConstPolyIter(ctx), ctx.size(), [&](seal::util::ConstRNSIter rns_iter_per_poly) {
             std::uint64_t rns_number = 0;
@@ -297,10 +286,12 @@ namespace sealtest
                << "poly" << poly_number++ << "\":{";
             SEAL_ITERATE(seal::util::iter(rns_iter_per_poly), modulus.size(), [&](auto coef_iter) {
                 ss << "\"" << modulus[rns_number++].value() << "\":[";
-                if (poly_number ==3){
-                    std:cout<<"";
+                if (poly_number == 3)
+                {
+                std:
+                    cout << "";
                 }
-                for (uint64_t j = 0; j < all.essence.parms.poly_modulus_degree(); ++j)
+                for (uint64_t j = 0; j < all.context.first_context_data()->parms().poly_modulus_degree(); ++j)
                 {
                     ss << *coef_iter << ",";
                     coef_iter++;
