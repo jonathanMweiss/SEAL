@@ -26,143 +26,25 @@ using namespace std;
 namespace sealtest::fracture
 {
 
-    TEST(PolyEvaluate, FindRootOfQuotient)
+    namespace polyval
     {
-        // need to do: find a single root.
-        // then evaluate the ctxs on that root.
-        // then multiply the ctxs and evaluate the result on the root.
-        auto all = SetupObjs::New();
-    }
-    TEST(PolyEvaluate, PtxIsScalar)
-    {
-        //        GTEST_SKIP();
-        //        auto all = SetupObjs::New();
-        //        seal::fractures::PolynomialEvaluator pe(all.essence);
-        //
-        //        for (int i = 0; i < 10; ++i)
-        //        {
-        //            auto ctx = all.random_ciphertext();
-        //
-        //            all.evaluator.transform_from_ntt_inplace(ctx);
-        //            auto actual = pe.evaluate(ctx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
-        //
-        //            seal::Plaintext p1(all.essence.parms.poly_modulus_degree());
-        //            p1[0] = std::uint64_t(all.prng()->generate()) % all.essence.parms.plain_modulus().value();
-        //
-        //            all.evaluator.plain_to_coeff_space(p1, all.essence.ctx.first_parms_id());
-        //            auto point = pe.evaluate(p1, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
-        //
-        //            all.evaluator.transform_plain_in_coeff_space_to_ntt_inplace(p1, all.essence.ctx.first_parms_id());
-        //
-        //            all.evaluator.transform_to_ntt_inplace(ctx);
-        //            all.evaluator.multiply_plain_inplace(ctx, p1);
-        //            all.evaluator.transform_from_ntt_inplace(ctx);
-        //
-        //            auto expected = pe.evaluate(ctx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
-        //
-        //            ASSERT_TRUE(expected == (actual * point));
-        //        }
-    }
+        TEST(PolyEvaluate, ctxXctx)
+        {
+            // need to do: find a single root.
+            // then evaluate the ctxs on that root.
+            // then multiply the ctxs and evaluate the result on the root.
+            auto all = SetupObjs::New();
+            std::vector root{ 9354911369072846, 1245024710537, 3761857733064 };
+            auto ctx1 = all.random_ciphertext();
+            auto ctx2 = all.random_ciphertext();
 
-    TEST(PolyEvaluate, ctxMultPtx)
-    {
-        //        // TODO: maybe im not getting the right value?
-        //        //   it seems to work when RNS-size ==1.
-        //        auto all = SetupObjs::New();
-        //        seal::fractures::PolynomialEvaluator pe(all.essence);
-        //        auto prng = all.prng();
-        //
-        //        auto ctx1 = all.random_ciphertext();
-        //        auto ptx = all.random_plaintext();
-        //
-        //        seal::Ciphertext mult_res;
-        //
-        //        auto ctx_data = all.context.get_context_data(all.context.first_parms_id());
-        //        auto root = ctx_data->small_ntt_tables()->get_root();
-        //        auto rns_tool = ctx_data->rns_tool();
-        //        auto root_rns = std::vector<std::uint64_t>(all.enc_params.coeff_modulus().size(), root);
-        //        rns_tool->base_q()->decompose(&(root_rns[0]), MemoryManager::GetPool());
-        //        std::cout << "root_rns size: " << root_rns.size() << std::endl;
-        //
-        //        all.evaluator.plain_to_coeff_space(ptx, all.essence.ctx.first_parms_id());
-        //        auto p1 = pe.evaluate(ptx, root_rns);
-        //
-        //        all.evaluator.transform_plain_in_coeff_space_to_ntt_inplace(ptx, all.essence.ctx.first_parms_id());
-        //        all.evaluator.multiply_plain(ctx1, ptx, mult_res);
-        //
-        //        all.evaluator.transform_from_ntt_inplace(ctx1);
-        //        auto c1 = pe.evaluate(ctx1, root_rns);
-        //
-        //        auto actual = c1 * p1;
-        //
-        //        //
-        //        all.evaluator.transform_from_ntt_inplace(mult_res);
-        //        auto expected = pe.evaluate(mult_res, root_rns);
-        //        ASSERT_TRUE(expected == actual);
-    }
-
-    TEST(PolyEvaluate, ctxAddCtx)
-    {
-        //        auto all = SetupObjs::New();
-        //        seal::fractures::PolynomialEvaluator pe(all.essence);
-        //
-        //        //        for (int i = 0; i < 500; ++i)
-        //        //        {
-        //
-        //        auto ctx_data = all.context.get_context_data(all.context.first_parms_id());
-        //        auto root = ctx_data->small_ntt_tables()->get_root();
-        //        auto rns_tool = ctx_data->rns_tool();
-        //        auto root_rns = std::vector<std::uint64_t>(all.enc_params.coeff_modulus().size(), root);
-        //        rns_tool->base_q()->decompose(&(root_rns[0]), MemoryManager::GetPool());
-        //        std::cout << "root_rns size: " << root_rns.size() << std::endl;
-        //
-        //        auto ctx1 = all.random_ciphertext();
-        //        auto ctx2 = all.random_ciphertext();
-        //        seal::Ciphertext addition_res;
-        //
-        //        all.evaluator.multiply(ctx1, ctx2, addition_res);
-        //
-        //        all.evaluator.transform_from_ntt_inplace(ctx1);
-        //        all.evaluator.transform_from_ntt_inplace(ctx2);
-        //
-        //        auto c1 = pe.evaluate(ctx1, root_rns);
-        //        auto c2 = pe.evaluate(ctx2, root_rns);
-        //        auto actual = c1 * c2;
-        //
-        //        all.evaluator.transform_from_ntt_inplace(addition_res);
-        //        auto expected = pe.evaluate(addition_res, root_rns);
-        //        ASSERT_TRUE(expected == actual);
-        //        }
-    }
+            seal::Ciphertext res;
+            all.evaluator.multiply(ctx1, ctx2, res);
+        }
+    } // namespace polyval
 
     namespace operations
     {
-        TEST(FracturedOps, PolyEvalEquals)
-        {
-            return;
-            //            auto all = SetupObjs::New();
-            //            seal::fractures::PolynomialEvaluator pe(all.essence);
-            //
-            //            auto ptx = all.random_plaintext();
-            //            auto ctx = all.random_ciphertext();
-            //
-            //            seal::Ciphertext res;
-            //            all.evaluator.multiply_plain(ctx, ptx, res);
-            //
-            //            all.evaluator.plain_to_coeff_space(ptx, all.essence.parms.parms_id());
-            //            auto point1 = pe.evaluate(ptx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
-            //
-            //            all.evaluator.transform_from_ntt_inplace(ctx);
-            //            auto cpoint = pe.evaluate(ctx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
-            //
-            //            all.evaluator.transform_from_ntt_inplace(res);
-            //            auto rpoint = pe.evaluate(res, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
-            //
-            //            cpoint *= point1;
-            //            // compare:
-            //            ASSERT_TRUE(cpoint == rpoint);
-            //            std::cout << "lols" << std::endl;
-        }
 
         TEST(FracturedOps, plaintextFracture)
         {
