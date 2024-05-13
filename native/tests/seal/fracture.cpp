@@ -30,16 +30,30 @@ namespace sealtest::fracture
     {
         TEST(PolyEvaluate, ctxXctx)
         {
-            // need to do: find a single root.
-            // then evaluate the ctxs on that root.
-            // then multiply the ctxs and evaluate the result on the root.
             auto all = SetupObjs::New();
-            std::vector root{ 9354911369072846, 1245024710537, 3761857733064 };
+
+            // root of X^n+1 in RNS form.
+            std::vector<std::uint64_t> root{ 9354911369072846, 1245024710537 };
+
             auto ctx1 = all.random_ciphertext();
             auto ctx2 = all.random_ciphertext();
 
             seal::Ciphertext res;
             all.evaluator.multiply(ctx1, ctx2, res);
+
+            all.evaluator.transform_from_ntt_inplace(res);
+            all.evaluator.transform_from_ntt_inplace(ctx1);
+            all.evaluator.transform_from_ntt_inplace(ctx2);
+
+            seal::fractures::PolynomialEvaluator pe(all.context);
+            auto ev1 = pe.evaluate(ctx1, root);
+            auto ev2 = pe.evaluate(ctx2, root);
+            auto ev_res = pe.evaluate(res, root);
+
+            // evaluate the multiplication:
+            auto ev_mul = ev1 * ev2;
+            // compare:
+            ASSERT_TRUE(ev_res == ev_mul);
         }
     } // namespace polyval
 
