@@ -3,6 +3,40 @@
 
 namespace seal::fractures
 {
+
+    /**
+     * methodology taken from evaluator.cpp
+     * Main idea is to move the plaintext from a single modulus representation to the same RNS representation as
+     * used in firstContextData (freshly minted ctx).
+     * @param plain that needed to be changed.
+     */
+    void ramp_up_polynomial(seal::Plaintext &plain, const seal::SEALContext &ctx)
+    {
+        auto &context_data = *ctx.first_context_data();
+        auto &parms = context_data.parms();
+        auto &coeff_modulus = parms.coeff_modulus();
+        size_t coeff_count = parms.poly_modulus_degree();
+        size_t coeff_modulus_size = coeff_modulus.size();
+        size_t plain_coeff_count = plain.coeff_count();
+
+        uint64_t plain_upper_half_threshold = context_data.plain_upper_half_threshold();
+        auto plain_upper_half_increment = context_data.plain_upper_half_increment();
+
+        plain.resize(coeff_count * coeff_modulus_size);
+        seal::util::RNSIter plain_iter(plain.data(), coeff_count);
+
+        auto helper_iter = reverse_iter(plain_iter, plain_upper_half_increment);
+        std::advance(helper_iter, -seal::util::safe_cast<ptrdiff_t>(coeff_modulus_size - 1));
+
+        // ramp up the polynomial to rns.
+        SEAL_ITERATE(helper_iter, coeff_modulus_size, [&](auto I) {
+            SEAL_ITERATE(iter(*plain_iter, std::get<0>(I)), plain_coeff_count, [&](auto J) {
+                std::get<1>(J) = SEAL_COND_SELECT(
+                    std::get<0>(J) >= plain_upper_half_threshold, std::get<0>(J) + std::get<1>(I), std::get<0>(J));
+            });
+        });
+    }
+
     EvaluatedPoint seal::fractures::PolynomialEvaluator::evaluate(
         seal::Plaintext &p, std::vector<std::uint64_t> &value) const
     {
@@ -11,7 +45,7 @@ namespace seal::fractures
             throw std::invalid_argument("Plaintext is already in NTT form, cannot evaluate it.");
         }
 
-        auto ctx_data = context.get_context_data(p.parms_id());
+        auto ctx_data = context.first_context_data();
         // otherwise, we need to uplift the ptx first, and i didn't want to implement it/ extract it out of the
         // evaluator.
         if (!ctx_data->qualifiers().using_fast_plain_lift)
@@ -19,15 +53,12 @@ namespace seal::fractures
             throw std::invalid_argument(
                 "haven't implemented polynomial evaluation without 'using_fast_plain_lift' set to true!.");
         }
+
+        ramp_up_polynomial(p, context);
+
         auto &parms = ctx_data->parms();
-
-        // plainmodulus is  at most 1 parameter. setting it into the vector
-        std::vector<seal::Modulus> plain_modulus{ parms.plain_modulus() };
-
-        validate_value_to_evaluate(value, plain_modulus);
-
         return evaluate_singe_RNS_polynomial(
-            seal::util::ConstRNSIter(p.data(), parms.poly_modulus_degree()), plain_modulus, value);
+            seal::util::ConstRNSIter(p.data(), parms.poly_modulus_degree()), parms.coeff_modulus(), value);
     }
 
     EvaluatedCipherPoint PolynomialEvaluator::evaluate(const Ciphertext &ctx, std::vector<std::uint64_t> &value) const

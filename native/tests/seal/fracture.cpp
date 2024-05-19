@@ -55,6 +55,37 @@ namespace sealtest::fracture
             // compare:
             ASSERT_TRUE(ev_res == ev_mul);
         }
+
+        TEST(PolyEvaluate, ctxXptx)
+        {
+            auto all = SetupObjs::New();
+
+            // root of X^n+1 in RNS form.
+            std::vector<std::uint64_t> root{ 9354911369072846, 1245024710537 };
+
+            auto ptx = all.random_plaintext();
+            auto ctx = all.random_ciphertext();
+
+            seal::Plaintext cpy;
+            all.evaluator.transform_to_ntt(ptx, ctx.parms_id(), cpy);
+
+            seal::Ciphertext res;
+            all.evaluator.multiply_plain(ctx, cpy, res);
+
+            all.evaluator.transform_from_ntt_inplace(res);
+            all.evaluator.transform_from_ntt_inplace(ctx);
+
+            // ptxroot:
+            seal::fractures::PolynomialEvaluator pe(all.context);
+            auto ev1 = pe.evaluate(ctx, root);
+            auto ev2 = pe.evaluate(ptx, root);
+            auto ev_res = pe.evaluate(res, root);
+
+            // evaluate the multiplication:
+            auto ev_mul = ev1 * ev2;
+            // compare:
+            ASSERT_TRUE(ev_res == ev_mul);
+        }
     } // namespace polyval
 
     namespace operations
