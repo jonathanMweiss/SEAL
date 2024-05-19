@@ -20,11 +20,11 @@ namespace seal::fractures
     public:
         PolynomialEvaluator(const SEALContext &ctx) : context(ctx){};
 
-        //        EvaluatedPoint evaluate(seal::Plaintext &p, std::vector<std::uint64_t> &&value) const
-        //        {
-        //            return evaluate(p, value);
-        //        }
-        //        EvaluatedPoint evaluate(seal::Plaintext &p, std::vector<std::uint64_t> &value) const;
+        EvaluatedPoint evaluate(seal::Plaintext &p, std::vector<std::uint64_t> &&value) const
+        {
+            return evaluate(p, value);
+        }
+        EvaluatedPoint evaluate(seal::Plaintext &p, std::vector<std::uint64_t> &value) const;
 
         EvaluatedCipherPoint evaluate(const seal::Ciphertext &ctx, std::vector<std::uint64_t> &&value) const
         {

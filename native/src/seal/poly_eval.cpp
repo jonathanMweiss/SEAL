@@ -3,39 +3,38 @@
 
 namespace seal::fractures
 {
-    // TODO: When evaluating a ptx, we might need to transfer it first to the CTX modulus domain, and ONLY then
-    //  evaluate. need to understand how to do it correctly.
+    EvaluatedPoint seal::fractures::PolynomialEvaluator::evaluate(
+        seal::Plaintext &p, std::vector<std::uint64_t> &value) const
+    {
+        if (p.is_ntt_form())
+        {
+            throw std::invalid_argument("Plaintext is already in NTT form, cannot evaluate it.");
+        }
 
-    //    EvaluatedPoint seal::fractures::PolynomialEvaluator::evaluate(
-    //        seal::Plaintext &p, std::vector<std::uint64_t> &value) const
-    //    {
-    //        if (p.is_ntt_form())
-    //        {
-    //            throw std::invalid_argument("Plaintext is already in NTT form");
-    //        }
-    //
-    //        auto ctx_data = context.get_context_data(p.parms_id());
-    //        auto &parms = ctx_data->parms();
-    //        std::vector<seal::Modulus> plain_modulus{ parms.plain_modulus() };
-    //
-    //        validate_value_to_evaluate(value, plain_modulus);
-    //
-    //        size_t coeff_count = parms.poly_modulus_degree();
-    //        size_t poly_size = p.dyn_array().size();
-    //
-    //        if (poly_size < coeff_count)
-    //        {
-    //            throw std::invalid_argument("Plaintext is too small. put in RNS representation.");
-    //        }
-    //
-    //        return evalute(seal::util::ConstRNSIter(p.data(), essence.coeff_count), plain_modulus, value);
-    //    }
+        auto ctx_data = context.get_context_data(p.parms_id());
+        // otherwise, we need to uplift the ptx first, and i didn't want to implement it/ extract it out of the
+        // evaluator.
+        if (!ctx_data->qualifiers().using_fast_plain_lift)
+        {
+            throw std::invalid_argument(
+                "haven't implemented polynomial evaluation without 'using_fast_plain_lift' set to true!.");
+        }
+        auto &parms = ctx_data->parms();
+
+        // plainmodulus is  at most 1 parameter. setting it into the vector
+        std::vector<seal::Modulus> plain_modulus{ parms.plain_modulus() };
+
+        validate_value_to_evaluate(value, plain_modulus);
+
+        return evaluate_singe_RNS_polynomial(
+            seal::util::ConstRNSIter(p.data(), parms.poly_modulus_degree()), plain_modulus, value);
+    }
 
     EvaluatedCipherPoint PolynomialEvaluator::evaluate(const Ciphertext &ctx, std::vector<std::uint64_t> &value) const
     {
         if (ctx.is_ntt_form())
         {
-            throw std::invalid_argument("Ciphertext is already in NTT form");
+            throw std::invalid_argument("Ciphertext is already in NTT form, cannot evaluate it.");
         }
 
         auto ctx_data = context.get_context_data(ctx.parms_id());
