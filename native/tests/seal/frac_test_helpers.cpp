@@ -273,6 +273,40 @@ namespace sealtest
         return fractured_matrices;
     }
 
+    void multiply_scalar(
+        const std::vector<std::uint64_t> &a, std::vector<std::uint64_t> &dest,
+        const std::vector<seal::Modulus> &modulus)
+    {
+        if (a.size() != dest.size())
+        {
+            throw std::invalid_argument("multiply_scalar: a and dest must have the same size");
+        }
+        if (a.size() > modulus.size())
+        {
+            throw std::invalid_argument("multiply_scalar: a and modulus must have the same size");
+        }
+
+        for (std::uint64_t i = 0; i < a.size(); ++i)
+        {
+            dest[i] = util::multiply_uint_mod(a[i], dest[i], modulus[i]);
+        }
+    }
+    std::string rns_number_to_string(const std::vector<std::uint64_t> &rns_number)
+    {
+        std::string s;
+        s += "{ ";
+        for (auto &i : rns_number)
+        {
+            s += std::to_string(i);
+            if (&i != &rns_number.back())
+            {
+                s += ", ";
+            }
+        }
+        s += " }";
+        return s;
+    }
+
     void ctx_to_json(std::stringstream &ss, const SetupObjs &all, const seal::Ciphertext &ctx)
     {
         //        auto &ss = std::cout;
@@ -288,8 +322,7 @@ namespace sealtest
                 ss << "\"" << modulus[rns_number++].value() << "\":[";
                 if (poly_number == 3)
                 {
-                std:
-                    cout << "";
+                    std::cout << "";
                 }
                 for (uint64_t j = 0; j < all.context.first_context_data()->parms().poly_modulus_degree(); ++j)
                 {

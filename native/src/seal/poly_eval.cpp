@@ -38,7 +38,7 @@ namespace seal::fractures
     }
 
     EvaluatedPoint seal::fractures::PolynomialEvaluator::evaluate(
-        seal::Plaintext &p, std::vector<std::uint64_t> &value) const
+        seal::Plaintext &p, const std::vector<std::uint64_t> &value) const
     {
         if (p.is_ntt_form())
         {
@@ -61,7 +61,8 @@ namespace seal::fractures
             seal::util::ConstRNSIter(p.data(), parms.poly_modulus_degree()), parms.coeff_modulus(), value);
     }
 
-    EvaluatedCipherPoint PolynomialEvaluator::evaluate(const Ciphertext &ctx, std::vector<std::uint64_t> &value) const
+    EvaluatedCipherPoint PolynomialEvaluator::evaluate(
+        const seal::Ciphertext &ctx, const std::vector<std::uint64_t> &value) const
     {
         if (ctx.is_ntt_form())
         {

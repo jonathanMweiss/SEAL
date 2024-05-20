@@ -17,6 +17,7 @@
 #include <ctime>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include "frac_test_helpers.cpp"
 #include "gtest/gtest.h"
@@ -28,13 +29,58 @@ namespace sealtest::fracture
 
     namespace polyval
     {
-        TEST(PolyEvaluate, ctxXctx)
+        // root of X^n+1 in RNS form. for specific ring of BGV
+
+        const std::vector<std::uint64_t> root{ 9354911369072846, 1245024710537 };
+        unsigned long find_primitive_nth_root(std::uint64_t n, const Modulus &modulus)
         {
-            auto all = SetupObjs::New();
+            std::uint64_t pow = (modulus.value() - 1) / n;
+            auto gexp = n / 2;
 
-            // root of X^n+1 in RNS form.
-            std::vector<std::uint64_t> root{ 9354911369072846, 1245024710537 };
+            while (true)
+            {
+                auto x = modulus.reduce(seal::random_uint64());
 
+                auto g = seal::util::exponentiate_uint_mod(x, pow, modulus);
+                if (1 != seal::util::exponentiate_uint_mod(g, gexp, modulus))
+                {
+                    return g;
+                }
+            }
+        }
+        std::vector<std::uint64_t> find_first_root(const SetupObjs &all)
+        {
+            auto ctx = all.context.first_context_data();
+            auto parms = ctx->parms();
+
+            std::vector<std::uint64_t> r;
+            for (std::uint64_t i = 0; i < parms.coeff_modulus().size(); ++i)
+            {
+                r.emplace_back(find_primitive_nth_root(parms.poly_modulus_degree() * 2, parms.coeff_modulus()[i]));
+            }
+
+            return root;
+        }
+
+        std::vector<std::vector<std::uint64_t>> generate_roots(const SetupObjs &all, int num_roots = 1 << 14)
+
+        {
+            std::vector<std::vector<std::uint64_t>> roots;
+            auto r = find_first_root(all);
+            //            auto r = root;
+
+            auto mod = all.context.first_context_data()->parms().coeff_modulus();
+            std::vector<std::uint64_t> cur(r);
+            for (int i = 0; i < num_roots; ++i)
+            {
+                roots.push_back({ cur });
+                multiply_scalar(r, cur, mod);
+            }
+            return roots;
+        }
+
+        bool random_ctx_ctx_sz(const SetupObjs &all, const vector<std::uint64_t> &r)
+        {
             auto ctx1 = all.random_ciphertext();
             auto ctx2 = all.random_ciphertext();
 
@@ -46,23 +92,18 @@ namespace sealtest::fracture
             all.evaluator.transform_from_ntt_inplace(ctx2);
 
             seal::fractures::PolynomialEvaluator pe(all.context);
-            auto ev1 = pe.evaluate(ctx1, root);
-            auto ev2 = pe.evaluate(ctx2, root);
-            auto ev_res = pe.evaluate(res, root);
+
+            auto ev1 = pe.evaluate(ctx1, r);
+            auto ev2 = pe.evaluate(ctx2, r);
+            auto ev_res = pe.evaluate(res, r);
 
             // evaluate the multiplication:
             auto ev_mul = ev1 * ev2;
-            // compare:
-            ASSERT_TRUE(ev_res == ev_mul);
+
+            return (ev_res == ev_mul);
         }
-
-        TEST(PolyEvaluate, ctxXptx)
+        bool random_ptx_ctx_sz(const SetupObjs &all, const vector<std::uint64_t> &r)
         {
-            auto all = SetupObjs::New();
-
-            // root of X^n+1 in RNS form.
-            std::vector<std::uint64_t> root{ 9354911369072846, 1245024710537 };
-
             auto ptx = all.random_plaintext();
             auto ctx = all.random_ciphertext();
 
@@ -77,14 +118,52 @@ namespace sealtest::fracture
 
             // ptxroot:
             seal::fractures::PolynomialEvaluator pe(all.context);
-            auto ev1 = pe.evaluate(ctx, root);
-            auto ev2 = pe.evaluate(ptx, root);
-            auto ev_res = pe.evaluate(res, root);
+            auto ev1 = pe.evaluate(ctx, r);
+            auto ev2 = pe.evaluate(ptx, r);
+            auto ev_res = pe.evaluate(res, r);
 
             // evaluate the multiplication:
             auto ev_mul = ev1 * ev2;
-            // compare:
-            ASSERT_TRUE(ev_res == ev_mul);
+            return (ev_res == ev_mul);
+        }
+
+        TEST(polyval, genRoot)
+        {
+            auto all = SetupObjs::New();
+            std::set<std::vector<std::uint64_t>> s;
+            for (int i = 0; i < 20; ++i)
+            {
+                auto r2 = generate_roots(all, 1 << 14);
+                s.insert(r2.begin(), r2.end());
+            }
+            ASSERT_EQ(s.size(), 1 << 14);
+        }
+
+        TEST(PolyEvaluate, ctxXctx)
+        {
+            auto all = SetupObjs::New();
+            auto r = root;
+
+            ASSERT_TRUE(random_ctx_ctx_sz(all, r));
+        }
+
+        TEST(PolyEvaluate, ctxXptx)
+        {
+            auto all = SetupObjs::New();
+
+            auto r = root;
+            ASSERT_TRUE(random_ptx_ctx_sz(all, r));
+        }
+        TEST(PolyEvaluate, exhaustiveSZCtxCtx)
+        {
+            FAIL(); // TODO!
+            //            auto all = SetupObjs::New();
+            //            auto roots = generate_roots(1 << 14);
+            //            auto r = root;
+            //            for (int i = 0; i < 100; ++i)
+            //            {
+            //                ASSERT_TRUE(random_ctx_ctx_sz(all, r));
+            //            }
         }
     } // namespace polyval
 

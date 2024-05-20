@@ -24,14 +24,14 @@ namespace seal::fractures
         {
             return evaluate(p, value);
         }
-        EvaluatedPoint evaluate(seal::Plaintext &p, std::vector<std::uint64_t> &value) const;
+        EvaluatedPoint evaluate(seal::Plaintext &p, const std::vector<std::uint64_t> &value) const;
 
         EvaluatedCipherPoint evaluate(const seal::Ciphertext &ctx, std::vector<std::uint64_t> &&value) const
         {
             return evaluate(ctx, value);
         }
 
-        EvaluatedCipherPoint evaluate(const seal::Ciphertext &ctx, std::vector<std::uint64_t> &value) const;
+        EvaluatedCipherPoint evaluate(const seal::Ciphertext &ctx, const std::vector<std::uint64_t> &value) const;
 
     private:
         EvaluatedPoint evaluate_singe_RNS_polynomial(

@@ -171,7 +171,11 @@ namespace seal::fractures
         return Empty(ctxf.poly_fracs.size(), ctxf.index, ctxf.poly_fracs[0].coeff_count, ctxf.coeff_modulus);
     }
 
-    bool CiphertextFracture::operator==(const CiphertextFracture &ctxf)
+    bool CiphertextFracture::operator!=(const CiphertextFracture &ctxf) const
+    {
+        return !(*this == ctxf);
+    }
+    bool CiphertextFracture::operator==(const CiphertextFracture &ctxf) const
     {
         if (index != ctxf.index)
         {

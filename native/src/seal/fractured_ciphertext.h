@@ -20,7 +20,8 @@ namespace seal::fractures
         const CiphertextFracture &operator+=(const CiphertextFracture &ctxf);
         const CiphertextFracture &operator*=(const CiphertextFracture &y);
 
-        bool operator==(const CiphertextFracture &ctxf);
+        bool operator==(const CiphertextFracture &ctxf) const;
+        bool operator!=(const CiphertextFracture &ctxf) const;
 
         // TODO: verify.
         CiphertextFracture operator*(const PolynomialFracture &poly) const;
@@ -69,7 +70,7 @@ namespace seal::fractures
 
             CiphertextFracture fracture{ {}, index, coeff_modulus };
             fracture.poly_fracs.reserve(ctx.size());
-            
+
             SEAL_ITERATE(seal::util::ConstPolyIter(ctx), ctx.size(), [&](seal::util::ConstRNSIter rns_iter_per_poly) {
                 // iterating through the ctx.size() number of polynomials.
                 fracture.poly_fracs.emplace_back(PolynomialFracturingTool::compute_fracture(
