@@ -39,20 +39,7 @@ namespace seal::fractures
          * @param n The n-th root of unity.
          * @return The root of unity.
          */
-        static std::uint64_t gen_root_of_unity(const seal::Modulus &m, std::uint64_t n)
-        {
-            // $a$ is primitive element (root) if each element that isn't $0$ can be expressed as
-            // $a^k$ for some $k$.
-            std::uint64_t a;
-            seal::util::try_minimal_primitive_root(n, m, a);
-
-            // a^(q-1)/n is an n-th root of unity.
-            // proof: we know that $a^(q-1)$ is 1 (fermat's little theorem),
-            // as a result, $a^k\ne 1$ for all $k < q-1$. otherwise there is a cycle that doesn't go through every
-            // element other than 0 in the field, in contradiction to $a$ being a generator/ primitive element.
-            // Thus, $w=a^(q-1)/n$ is an n-th root of unity, because w^n = a^(q-1) = 1 and w^k != 1 for all k < n.
-            return seal::util::exponentiate_uint_mod(a, (m.value() - 1 / n), m);
-        }
+        static std::uint64_t gen_root_of_unity(const seal::Modulus &m, std::uint64_t n);
 
         /**
          * generate possible evaluation values for polynomials.
@@ -71,57 +58,14 @@ namespace seal::fractures
          * @return
          */
         static std::vector<std::uint64_t> generate_first_polyeval_ring_homomorphism_value(
-            const seal::SEALContext &cntx, seal::parms_id_type pid)
-        {
-            auto parms = cntx.get_context_data(pid)->parms();
-
-            std::vector<std::uint64_t> r;
-            for (std::uint64_t i = 0; i < parms.coeff_modulus().size(); ++i)
-            {
-                auto m = parms.coeff_modulus()[i];
-                r.emplace_back(gen_root_of_unity(m, parms.poly_modulus_degree() * 2));
-            }
-            return r;
-        }
+            const seal::SEALContext &cntx, seal::parms_id_type pid);
 
         static void multiply_scalar(
             const std::vector<std::uint64_t> &a, std::vector<std::uint64_t> &dest,
-            const std::vector<seal::Modulus> &modulus)
-        {
-            if (a.size() != dest.size())
-            {
-                throw std::invalid_argument("multiply_scalar: a and dest must have the same size");
-            }
-            if (a.size() > modulus.size())
-            {
-                throw std::invalid_argument("multiply_scalar: a and modulus must have the same size");
-            }
-
-            for (std::uint64_t i = 0; i < a.size(); ++i)
-            {
-                dest[i] = util::multiply_uint_mod(a[i], dest[i], modulus[i]);
-            }
-        }
+            const std::vector<seal::Modulus> &modulus);
 
         static std::vector<std::vector<std::uint64_t>> generate_possible_polyeval_ring_homomorphism_values(
-            const seal::SEALContext &cntx, seal::parms_id_type pid)
-        {
-            auto parms = cntx.get_context_data(pid)->parms();
-            auto r = generate_first_polyeval_ring_homomorphism_value(cntx, pid);
-
-            std::vector<std::vector<std::uint64_t>> roots;
-            std::vector<std::uint64_t> cur(r);
-            for (std::uint64_t i = 0; i < parms.poly_modulus_degree() * 2; ++i)
-            {
-                if (0 == (i & 1))
-                {
-                    roots.push_back({ cur });
-                }
-                multiply_scalar(r, cur, parms.coeff_modulus());
-            }
-
-            return roots;
-        }
+            const seal::SEALContext &cntx, seal::parms_id_type pid);
 
     private:
         EvaluatedPoint evaluate_singe_RNS_polynomial(
