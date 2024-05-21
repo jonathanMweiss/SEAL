@@ -351,4 +351,107 @@ namespace sealtest
         ctx_json_into_file(ss, filename);
     }
 
+    // root of X^n+1 in RNS form. for specific ring of BGV used in all of these tests.
+    const std::vector<std::uint64_t> root{ 9354911369072846, 1245024710537 };
+
+    template <typename MatrixType, typename EvaluatedType>
+    util::matrix<EvaluatedType> evaluate_matrix(const SetupObjs &all, seal::util::matrix<MatrixType> &m)
+    {
+        std::vector<EvaluatedType> inner_vec;
+        seal::fractures::PolynomialEvaluator pe(all.context);
+
+        for (std::size_t i = 0; i < m.rows; ++i)
+        {
+            for (std::size_t j = 0; j < m.cols; ++j)
+            {
+                inner_vec.emplace_back(pe.evaluate(m(i, j), root));
+            }
+        }
+        return seal::util::matrix<EvaluatedType>(m.rows, m.cols, std::move(inner_vec));
+    }
+
+    std::vector<std::vector<std::uint64_t>> generate_roots(const SetupObjs &all, int num_roots = 1 << 14)
+    {
+        std::vector<std::vector<std::uint64_t>> roots;
+        auto r = root;
+
+        auto mod = all.context.first_context_data()->parms().coeff_modulus();
+        std::vector<std::uint64_t> cur(r);
+        for (int i = 0; i < num_roots; ++i)
+        {
+            if (0 == (i & 1))
+            {
+                roots.push_back({ cur });
+            }
+            multiply_scalar(r, cur, mod);
+        }
+        return roots;
+    }
+
+    bool random_ctx_ctx_sz(const SetupObjs &all, const vector<std::uint64_t> &r)
+    {
+        auto ctx1 = all.random_ciphertext();
+        auto ctx2 = all.random_ciphertext();
+
+        seal::Ciphertext res;
+        all.evaluator.multiply(ctx1, ctx2, res);
+
+        all.evaluator.transform_from_ntt_inplace(res);
+        all.evaluator.transform_from_ntt_inplace(ctx1);
+        all.evaluator.transform_from_ntt_inplace(ctx2);
+
+        seal::fractures::PolynomialEvaluator pe(all.context);
+
+        auto ev1 = pe.evaluate(ctx1, r);
+        auto ev2 = pe.evaluate(ctx2, r);
+        auto ev_res = pe.evaluate(res, r);
+
+        // evaluate the multiplication:
+        auto ev_mul = ev1 * ev2;
+
+        return (ev_res == ev_mul);
+    }
+    bool random_ptx_ctx_sz(const SetupObjs &all, const vector<std::uint64_t> &r)
+    {
+        auto ptx = all.random_plaintext();
+        auto ctx = all.random_ciphertext();
+
+        seal::Plaintext cpy;
+        all.evaluator.transform_to_ntt(ptx, ctx.parms_id(), cpy);
+
+        seal::Ciphertext res;
+        all.evaluator.multiply_plain(ctx, cpy, res);
+
+        all.evaluator.transform_from_ntt_inplace(res);
+        all.evaluator.transform_from_ntt_inplace(ctx);
+
+        // ptxroot:
+        seal::fractures::PolynomialEvaluator pe(all.context);
+        auto ev1 = pe.evaluate(ctx, r);
+        auto ev2 = pe.evaluate(ptx, r);
+        auto ev_res = pe.evaluate(res, r);
+
+        // evaluate the multiplication:
+        auto ev_mul = ev1 * ev2;
+        return (ev_res == ev_mul);
+    }
+
+    template <typename T>
+    void apply_on_each_element(seal::util::matrix<T> &m, std::function<void(T &)> f)
+    {
+        for (auto &elem : m.data)
+        {
+            f(elem);
+        }
+    }
+
+    template <typename T>
+    void apply_on_each_element(seal::util::matrix<T> &m, void (*f)(T &))
+    {
+        for (auto &elem : m.data)
+        {
+            f(elem);
+        }
+    }
+
 } // namespace sealtest

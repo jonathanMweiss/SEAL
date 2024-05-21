@@ -28,74 +28,6 @@ namespace sealtest::fracture
 
     namespace polyval
     {
-        // root of X^n+1 in RNS form. for specific ring of BGV used in all of these tests.
-        const std::vector<std::uint64_t> root{ 9354911369072846, 1245024710537 };
-
-        std::vector<std::vector<std::uint64_t>> generate_roots(const SetupObjs &all, int num_roots = 1 << 14)
-        {
-            std::vector<std::vector<std::uint64_t>> roots;
-            auto r = root;
-
-            auto mod = all.context.first_context_data()->parms().coeff_modulus();
-            std::vector<std::uint64_t> cur(r);
-            for (int i = 0; i < num_roots; ++i)
-            {
-                if (0 == (i & 1))
-                {
-                    roots.push_back({ cur });
-                }
-                multiply_scalar(r, cur, mod);
-            }
-            return roots;
-        }
-
-        bool random_ctx_ctx_sz(const SetupObjs &all, const vector<std::uint64_t> &r)
-        {
-            auto ctx1 = all.random_ciphertext();
-            auto ctx2 = all.random_ciphertext();
-
-            seal::Ciphertext res;
-            all.evaluator.multiply(ctx1, ctx2, res);
-
-            all.evaluator.transform_from_ntt_inplace(res);
-            all.evaluator.transform_from_ntt_inplace(ctx1);
-            all.evaluator.transform_from_ntt_inplace(ctx2);
-
-            seal::fractures::PolynomialEvaluator pe(all.context);
-
-            auto ev1 = pe.evaluate(ctx1, r);
-            auto ev2 = pe.evaluate(ctx2, r);
-            auto ev_res = pe.evaluate(res, r);
-
-            // evaluate the multiplication:
-            auto ev_mul = ev1 * ev2;
-
-            return (ev_res == ev_mul);
-        }
-        bool random_ptx_ctx_sz(const SetupObjs &all, const vector<std::uint64_t> &r)
-        {
-            auto ptx = all.random_plaintext();
-            auto ctx = all.random_ciphertext();
-
-            seal::Plaintext cpy;
-            all.evaluator.transform_to_ntt(ptx, ctx.parms_id(), cpy);
-
-            seal::Ciphertext res;
-            all.evaluator.multiply_plain(ctx, cpy, res);
-
-            all.evaluator.transform_from_ntt_inplace(res);
-            all.evaluator.transform_from_ntt_inplace(ctx);
-
-            // ptxroot:
-            seal::fractures::PolynomialEvaluator pe(all.context);
-            auto ev1 = pe.evaluate(ctx, r);
-            auto ev2 = pe.evaluate(ptx, r);
-            auto ev_res = pe.evaluate(res, r);
-
-            // evaluate the multiplication:
-            auto ev_mul = ev1 * ev2;
-            return (ev_res == ev_mul);
-        }
 
         TEST(PolyEvaluate, ctxXctx)
         {
@@ -136,6 +68,78 @@ namespace sealtest::fracture
             {
                 ASSERT_TRUE(random_ptx_ctx_sz(all, r));
             }
+        }
+
+        /**
+         * Generate a root of unity for a given modulus and n.
+         * @param m The modulus.
+         * @param n The n-th root of unity.
+         * @return The root of unity.
+         */
+        std::uint64_t gen_root_of_unity(const seal::Modulus &m, std::uint64_t n)
+        {
+            // $a$ is primitive element (root) if each element that isn't $0$ can be expressed as
+            // $a^k$ for some $k$.
+            std::uint64_t a;
+            seal::util::try_minimal_primitive_root(n, m, a);
+
+            // a^(q-1)/n is an n-th root of unity.
+            // proof: we know that $a^(q-1)$ is 1 (fermat's little theorem),
+            // as a result, $a^k\ne 1$ for all $k < q-1$. otherwise there is a cycle that doesn't go through every
+            // element other than 0 in the field, in contradiction to $a$ being a generator/ primitive element.
+            // Thus, $w=a^(q-1)/n$ is an n-th root of unity, because w^n = a^(q-1) = 1 and w^k != 1 for all k < n.
+            return seal::util::exponentiate_uint_mod(a, (m.value() - 1 / n), m);
+        }
+        
+        std::vector<std::uint64_t> generate_root_of_unity(const seal::SEALContext &cntx, seal::parms_id_type pid)
+        {
+            auto parms = cntx.get_context_data(pid)->parms();
+
+            std::vector<std::uint64_t> r;
+            for (std::uint64_t i = 0; i < parms.coeff_modulus().size(); ++i)
+            {
+                auto m = parms.coeff_modulus()[i];
+                r.emplace_back(gen_root_of_unity(m, 1 << 14));
+            }
+            return r;
+        }
+
+        std::vector<std::uint64_t> generate_root_of_unity(const seal::SEALContext &cntx)
+        {
+            return generate_root_of_unity(cntx, cntx.first_parms_id());
+        }
+
+        TEST(PolyEvaluate, genpoint)
+        {
+            auto all = SetupObjs::New();
+            auto parms = all.context.first_context_data()->parms();
+
+            auto r = generate_root_of_unity(all.context);
+            if (random_ctx_ctx_sz(all, r))
+            {
+                std::cout << "Success" << std::endl;
+            }
+            else
+            {
+                std::cout << "Fail" << std::endl;
+            }
+        }
+        TEST(PolyEvaluate, PIR_SZ)
+        {
+            auto all = SetupObjs::New();
+
+            std::uint64_t vec_size = 5;
+
+            seal::util::matrix<Ciphertext> query_right(vec_size, 1, random_ctx_vector(all, int(vec_size)));
+            seal::util::matrix<Ciphertext> query_left(1, vec_size, random_ctx_vector(all, int(vec_size)));
+            apply_on_each_element<Ciphertext>(
+                query_right, [&](Ciphertext &c) -> void { all.evaluator.transform_from_ntt_inplace(c); });
+            //            //            seal::util::matrix<Plaintext> db(vec_size, vec_size, random_ptxs(all,
+            //            int(vec_size *
+            //            //            vec_size)));
+            //
+            //            evaluate_matrix<Ciphertext, seal::fractures::EvaluatedCipherPoint>(all, query_right);
+            //            // Create evaluated matrices:
         }
     } // namespace polyval
 
