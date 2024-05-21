@@ -44,31 +44,7 @@ namespace sealtest::fracture
             auto r = root;
             ASSERT_TRUE(random_ptx_ctx_sz(all, r));
         }
-        TEST(PolyEvaluate, exhaustiveSZCtxCtx)
-        {
-            GTEST_SKIP();
 
-            auto all = SetupObjs::New();
-            auto roots = generate_roots(all, 1 << 14);
-
-            for (auto &r : roots)
-            {
-                ASSERT_TRUE(random_ctx_ctx_sz(all, r));
-            }
-        }
-
-        TEST(PolyEvaluate, exhaustiveSZptxCtx)
-        {
-            GTEST_SKIP();
-
-            auto all = SetupObjs::New();
-            auto roots = generate_roots(all, 1 << 14);
-
-            for (auto &r : roots)
-            {
-                ASSERT_TRUE(random_ptx_ctx_sz(all, r));
-            }
-        }
 
         /**
          * Generate a root of unity for a given modulus and n.
@@ -90,8 +66,25 @@ namespace sealtest::fracture
             // Thus, $w=a^(q-1)/n$ is an n-th root of unity, because w^n = a^(q-1) = 1 and w^k != 1 for all k < n.
             return seal::util::exponentiate_uint_mod(a, (m.value() - 1 / n), m);
         }
-        
-        std::vector<std::uint64_t> generate_root_of_unity(const seal::SEALContext &cntx, seal::parms_id_type pid)
+
+        /**
+         * generate possible evaluation values for polynomials.
+         *
+         * To evaluate polynomials over Z_q[X]/(X^n + 1),
+         * one should use values which can be used to create an evaluation map $f_a(P(X))$ for a polynomial P(X),
+         * such that $f_a$ is a ring homomorphism. That is, $f_a(P(X) + Q(X)) = f_a(P(X)) + f_a(Q(X))$ and
+         * $f_a(P(X) * Q(X)) = f_a(P(X)) * f_a(Q(X))$ for every $P(X), Q(X) \in Z_q[X]/(X^n + 1)$.
+         *
+         * $f_a$ is a ring homomorphism if and only if $a$ is a root of $X^n+1$.
+         *
+         * It is hard to find such elements. Luckily, we know that $(X^2n-1)=(X^n+1)(X^n-1)$ (thus if $X^n+1$ has roots
+         * they must be roots for $X^2n-1$, too). In addition, we know that the $2n-th$ roots of unity are the roots for
+         * $X^2n-1$. (since every $(w_i)^2n = 1$) and since all of them can't be the roots of $X^n-1$ (i.e., $X^n-1$ has
+         * at most $n$ solutions)., the other $n$ elements must be roots for $X^n+1$.
+         * @return
+         */
+        std::vector<std::uint64_t> generate_first_polyeval_ring_homomorphism_value(
+            const seal::SEALContext &cntx, seal::parms_id_type pid)
         {
             auto parms = cntx.get_context_data(pid)->parms();
 
@@ -99,14 +92,55 @@ namespace sealtest::fracture
             for (std::uint64_t i = 0; i < parms.coeff_modulus().size(); ++i)
             {
                 auto m = parms.coeff_modulus()[i];
-                r.emplace_back(gen_root_of_unity(m, 1 << 14));
+                r.emplace_back(gen_root_of_unity(m, parms.poly_modulus_degree() * 2));
             }
             return r;
         }
 
-        std::vector<std::uint64_t> generate_root_of_unity(const seal::SEALContext &cntx)
+        std::vector<std::vector<std::uint64_t>> generate_possible_polyeval_ring_homomorphism_values(
+            const seal::SEALContext &cntx, seal::parms_id_type pid)
         {
-            return generate_root_of_unity(cntx, cntx.first_parms_id());
+            auto parms = cntx.get_context_data(pid)->parms();
+            auto r = generate_first_polyeval_ring_homomorphism_value(cntx, pid);
+
+            std::vector<std::vector<std::uint64_t>> roots;
+            std::vector<std::uint64_t> cur(r);
+            for (std::uint64_t i = 0; i < parms.poly_modulus_degree() * 2; ++i)
+            {
+                if (0 == (i & 1))
+                {
+                    roots.push_back({ cur });
+                }
+                multiply_scalar(r, cur, parms.coeff_modulus());
+            }
+
+            return roots;
+        }
+
+        TEST(PolyEvaluate, exhaustiveSZCtxCtx)
+        {
+            //            GTEST_SKIP();
+
+            auto all = SetupObjs::New();
+            auto roots = generate_possible_polyeval_ring_homomorphism_values(all.context, all.context.first_parms_id());
+
+            for (auto &r : roots)
+            {
+                ASSERT_TRUE(random_ctx_ctx_sz(all, r));
+            }
+        }
+
+        TEST(PolyEvaluate, exhaustiveSZptxCtx)
+        {
+            GTEST_SKIP();
+
+            auto all = SetupObjs::New();
+            auto roots = generate_roots(all, 1 << 14);
+
+            for (auto &r : roots)
+            {
+                ASSERT_TRUE(random_ptx_ctx_sz(all, r));
+            }
         }
 
         TEST(PolyEvaluate, genpoint)
@@ -114,16 +148,14 @@ namespace sealtest::fracture
             auto all = SetupObjs::New();
             auto parms = all.context.first_context_data()->parms();
 
-            auto r = generate_root_of_unity(all.context);
-            if (random_ctx_ctx_sz(all, r))
+            //            auto r = generate_root_of_unity(all.context);
+            auto rs = generate_possible_polyeval_ring_homomorphism_values(all.context, all.context.first_parms_id());
+            for (auto &r : rs)
             {
-                std::cout << "Success" << std::endl;
-            }
-            else
-            {
-                std::cout << "Fail" << std::endl;
+                std::cout << random_ctx_ctx_sz(all, r) << std::endl;
             }
         }
+
         TEST(PolyEvaluate, PIR_SZ)
         {
             auto all = SetupObjs::New();
