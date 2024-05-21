@@ -3,7 +3,6 @@
 #include "seal/evaluator.h"
 #include "seal/plaintext.h"
 #include <utility>
-#include "fractured_rns.h"
 #include "matrix.h"
 
 namespace seal::fractures
@@ -68,6 +67,39 @@ namespace seal::fractures
     };
 
     /**
+     * Can compute fractures on demand.
+     * assumes that the polynomial is already in NTT form, and is in the correct moduli.
+     * (Assumes first encryption parameters for the polynomial)
+     */
+    class PolynomialFracturingTool
+    {
+    public:
+        /**
+         * Extracts a single fracture out of numerous possible fractures over a polynomial.
+         * @param p the plaintext to extract the fracture from.
+         * @param ctx the SEAL context.
+         * @param num_fractures is the number of expected fractures to be made over the polynomial.
+         * @param index the index of the fracture (0 <= index < num_fractures).
+         * @return a PolynomialFracture object.
+         */
+        static PolynomialFracture compute_fracture(
+            const seal::Plaintext &p, const seal::SEALContext &ctx, uint64_t num_fractures, uint64_t index);
+
+        /**
+         * Computes a single fracture out of numerous possible fractures over a polynomial.
+         * @param num_fractures is the number of expected fractures to be made over the polynomial.
+         * @param index the index of the fracture (0 <= index < num_fractures).
+         * @param coeff_count the number of coefficients in the polynomial.
+         * @param coeff_modulus_size the number of moduli in the polynomial. (used to determine the number of RNS slots)
+         * @param constiter an iterator over the polynomial coefficients.
+         * @return a PolynomialFracture object.
+         */
+        static PolynomialFracture compute_fracture(
+            uint64_t num_fractures, uint64_t index, size_t coeff_count, uint64_t coeff_modulus_size,
+            const util::ConstRNSIter &constiter);
+    };
+
+    /**
      * Fractures a polynomial into multiple PolynomialFracture.
      * these polynomials are used to perform multiplication between a ciphertext and a plaintext in a distributed
      * manner.
@@ -75,11 +107,22 @@ namespace seal::fractures
     class Polynomial
     {
     public:
-        explicit Polynomial(const seal::util::ConstRNSIter &p, Essence e, std::uint64_t _num_fractures) noexcept;
+        explicit Polynomial(
+            const seal::Plaintext &p, const seal::SEALContext &context, std::uint64_t _num_fractures) noexcept
+            : fractures(), num_fractures(_num_fractures)
+        {
+            seal::util::ConstRNSIter iter(p.data(), context.first_context_data()->parms().poly_modulus_degree());
 
-        explicit Polynomial(const seal::Plaintext &p, const Essence &e, std::uint64_t _num_fractures) noexcept
-            : Polynomial(seal::util::ConstRNSIter(p.data(), e.coeff_count), e, _num_fractures)
-        {}
+            auto cntx_data = context.get_context_data(p.parms_id());
+            const EncryptionParameters &params = cntx_data->parms();
+            fractures.reserve(num_fractures);
+
+            for (std::uint64_t i = 0; i < num_fractures; ++i)
+            {
+                fractures.push_back(compute_fracture(
+                    iter, params.coeff_modulus().size(), params.poly_modulus_degree(), num_fractures, i));
+            }
+        }
 
         const PolynomialFracture &get_fracture(std::uint64_t index);
         const PolynomialFracture &operator[](std::uint64_t index);
@@ -100,6 +143,5 @@ namespace seal::fractures
 
         std::vector<PolynomialFracture> fractures;
         std::uint64_t num_fractures;
-        const Essence essence;
     };
 } // namespace seal::fractures

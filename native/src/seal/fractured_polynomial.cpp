@@ -8,38 +8,7 @@ namespace seal::fractures
         const seal::util::ConstRNSIter &rns_iter, std::uint64_t modulus_size, uint64_t num_coeffs,
         uint64_t num_fractures, uint64_t index)
     {
-        PolynomialFracture fracture(index, num_coeffs / num_fractures, modulus_size);
-
-        std::uint64_t rns_num = 0;
-        // We run up to modulus_size-1 because the inner loop moves from first position to the end.
-        // for example, when mudulus_size==1, we move from 0 and up to 1,  thus we go through the whole range.
-        SEAL_ITERATE(seal::util::iter(rns_iter), modulus_size - 1, [&](auto coef_iter) {
-            coef_iter += index * num_coeffs / num_fractures;
-            auto write_into_iter = fracture.rns_poly_iter(rns_num);
-            for (uint64_t j = 0; j < num_coeffs / num_fractures; ++j)
-            {
-                *write_into_iter = *coef_iter;
-                //                fracture.rns_coefficients(j, rns_num) = *coef_iter;
-                coef_iter++;
-                write_into_iter++;
-            }
-
-            rns_num++;
-        });
-
-        return fracture;
-    }
-
-    Polynomial::Polynomial(const seal::util::ConstRNSIter &p, Essence e, std::uint64_t _num_fractures) noexcept
-        : num_fractures(_num_fractures), essence(std::move(e))
-    {
-        fractures.reserve(num_fractures);
-
-        for (std::uint64_t i = 0; i < num_fractures; ++i)
-        {
-            fractures.push_back(
-                compute_fracture(p, essence.parms.coeff_modulus().size(), essence.coeff_count, num_fractures, i));
-        }
+        return PolynomialFracturingTool::compute_fracture(num_fractures, index, num_coeffs, modulus_size, rns_iter);
     }
 
     const PolynomialFracture &Polynomial::get_fracture(std::uint64_t index)
@@ -230,4 +199,39 @@ namespace seal::fractures
         stream.exceptions(old_except_mask);
     }
 
+    PolynomialFracture PolynomialFracturingTool::compute_fracture(
+        const Plaintext &p, const SEALContext &ctx, uint64_t num_fractures, uint64_t index)
+    {
+        auto coeff_count = p.coeff_count();
+
+        auto contex_data = ctx.get_context_data(p.parms_id());
+        auto enc_params = contex_data->parms();
+        auto coeff_modulus = enc_params.coeff_modulus();
+
+        seal::util::ConstRNSIter constiter(p.data(), coeff_count);
+
+        return compute_fracture(num_fractures, index, coeff_count, coeff_modulus.size(), constiter);
+    }
+
+    PolynomialFracture PolynomialFracturingTool::compute_fracture(
+        uint64_t num_fractures, uint64_t index, size_t coeff_count, uint64_t coeff_modulus_size,
+        const util::ConstRNSIter &constiter)
+    {
+        PolynomialFracture fracture(index, coeff_count / num_fractures, coeff_modulus_size);
+
+        uint64_t rns_index = 0;
+        SEAL_ITERATE(seal::util::iter(constiter), coeff_modulus_size, [&](auto coef_iter) {
+            coef_iter += index * coeff_count / num_fractures;
+            auto write_into_iter = fracture.rns_poly_iter(rns_index++);
+
+            for (uint64_t j = 0; j < coeff_count / num_fractures; ++j)
+            {
+                *write_into_iter = *coef_iter;
+                //                fracture.rns_coefficients(j, rns_num) = *coef_iter;
+                coef_iter++;
+                write_into_iter++;
+            }
+        });
+        return fracture;
+    }
 } // namespace seal::fractures

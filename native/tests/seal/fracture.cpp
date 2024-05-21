@@ -1,4 +1,3 @@
-// Test for fractured operations by JonathanWeiss.
 
 #include "seal/batchencoder.h"
 #include "seal/ckks.h"
@@ -17,6 +16,7 @@
 #include <ctime>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include "frac_test_helpers.cpp"
 #include "gtest/gtest.h"
@@ -26,133 +26,85 @@ using namespace std;
 namespace sealtest::fracture
 {
 
-    TEST(PolyEvaluate, PtxIsScalar)
+    namespace polyval
     {
-        auto all = SetupObjs::New();
-        seal::fractures::PolynomialEvaluator pe(all.essence);
 
-        for (int i = 0; i < 10; ++i)
+        TEST(PolyEvaluate, ctxXctx)
         {
-            auto ctx = all.random_ciphertext();
+            auto all = SetupObjs::New();
+            auto r = seal::fractures::PolynomialEvaluator::generate_first_polyeval_ring_homomorphism_value(
+                all.context, all.context.first_parms_id());
 
-            all.evaluator.transform_from_ntt_inplace(ctx);
-            auto actual = pe.evaluate(ctx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
-
-            seal::Plaintext p1(all.essence.parms.poly_modulus_degree());
-            p1[0] = std::uint64_t(all.prng()->generate()) % all.essence.parms.plain_modulus().value();
-
-            all.evaluator.plain_to_coeff_space(p1, all.essence.ctx.first_parms_id());
-            auto point = pe.evaluate(p1, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
-
-            all.evaluator.transform_plain_in_coeff_space_to_ntt_inplace(p1, all.essence.ctx.first_parms_id());
-
-            all.evaluator.transform_to_ntt_inplace(ctx);
-            all.evaluator.multiply_plain_inplace(ctx, p1);
-            all.evaluator.transform_from_ntt_inplace(ctx);
-
-            auto expected = pe.evaluate(ctx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
-
-            ASSERT_TRUE(expected == (actual * point));
+            ASSERT_TRUE(random_ctx_ctx_sz(all, r));
         }
-    }
 
-    TEST(PolyEvaluate, ctxMultPtx)
-    {
-        // TODO: maybe im not getting the right value?
-        //   it seems to work when RNS-size ==1.
-        auto all = SetupObjs::New();
-        seal::fractures::PolynomialEvaluator pe(all.essence);
-        auto prng = all.prng();
+        TEST(PolyEvaluate, ctxXptx)
+        {
+            auto all = SetupObjs::New();
 
-        auto ctx1 = all.random_ciphertext();
-        auto ptx = all.random_plaintext();
+            auto r = seal::fractures::PolynomialEvaluator::generate_first_polyeval_ring_homomorphism_value(
+                all.context, all.context.first_parms_id());
+            ASSERT_TRUE(random_ptx_ctx_sz(all, r));
+        }
 
-        seal::Ciphertext mult_res;
+        TEST(PolyEvaluate, exhaustiveSZCtxCtx)
+        {
+            GTEST_SKIP();
+            auto all = SetupObjs::New();
+            auto roots = seal::fractures::PolynomialEvaluator::generate_possible_polyeval_ring_homomorphism_values(
+                all.context, all.context.first_parms_id());
 
-        auto ctx_data = all.context.get_context_data(all.context.first_parms_id());
-        auto root = ctx_data->small_ntt_tables()->get_root();
-        auto rns_tool = ctx_data->rns_tool();
-        auto root_rns = std::vector<std::uint64_t>(all.enc_params.coeff_modulus().size(), root);
-        rns_tool->base_q()->decompose(&(root_rns[0]), MemoryManager::GetPool());
-        std::cout << "root_rns size: " << root_rns.size() << std::endl;
+            for (auto &r : roots)
+            {
+                ASSERT_TRUE(random_ctx_ctx_sz(all, r));
+            }
+        }
 
-        all.evaluator.plain_to_coeff_space(ptx, all.essence.ctx.first_parms_id());
-        auto p1 = pe.evaluate(ptx, root_rns);
+        TEST(PolyEvaluate, exhaustiveSZptxCtx)
+        {
+            GTEST_SKIP();
+            auto all = SetupObjs::New();
+            auto roots = seal::fractures::PolynomialEvaluator::generate_possible_polyeval_ring_homomorphism_values(
+                all.context, all.context.first_parms_id());
 
-        all.evaluator.transform_plain_in_coeff_space_to_ntt_inplace(ptx, all.essence.ctx.first_parms_id());
-        all.evaluator.multiply_plain(ctx1, ptx, mult_res);
+            for (auto &r : roots)
+            {
+                ASSERT_TRUE(random_ptx_ctx_sz(all, r));
+            }
+        }
 
-        all.evaluator.transform_from_ntt_inplace(ctx1);
-        auto c1 = pe.evaluate(ctx1, root_rns);
+        TEST(PolyEvaluate, PIR_SZ)
+        {
+            auto all = SetupObjs::New();
 
-        auto actual = c1 * p1;
+            std::uint64_t vec_size = 5;
 
-        //
-        all.evaluator.transform_from_ntt_inplace(mult_res);
-        auto expected = pe.evaluate(mult_res, root_rns);
-        ASSERT_TRUE(expected == actual);
-    }
-
-    TEST(PolyEvaluate, ctxAddCtx)
-    {
-        auto all = SetupObjs::New();
-        seal::fractures::PolynomialEvaluator pe(all.essence);
-
-        //        for (int i = 0; i < 500; ++i)
-        //        {
-
-        auto ctx_data = all.context.get_context_data(all.context.first_parms_id());
-        auto root = ctx_data->small_ntt_tables()->get_root();
-        auto rns_tool = ctx_data->rns_tool();
-        auto root_rns = std::vector<std::uint64_t>(all.enc_params.coeff_modulus().size(), root);
-        rns_tool->base_q()->decompose(&(root_rns[0]), MemoryManager::GetPool());
-        std::cout << "root_rns size: " << root_rns.size() << std::endl;
-
-        auto ctx1 = all.random_ciphertext();
-        auto ctx2 = all.random_ciphertext();
-        seal::Ciphertext addition_res;
-
-        all.evaluator.multiply(ctx1, ctx2, addition_res);
-
-        all.evaluator.transform_from_ntt_inplace(ctx1);
-        all.evaluator.transform_from_ntt_inplace(ctx2);
-
-        auto c1 = pe.evaluate(ctx1, root_rns);
-        auto c2 = pe.evaluate(ctx2, root_rns);
-        auto actual = c1 * c2;
-
-        all.evaluator.transform_from_ntt_inplace(addition_res);
-        auto expected = pe.evaluate(addition_res, root_rns);
-        ASSERT_TRUE(expected == actual);
-        //        }
-    }
+            seal::util::matrix<Ciphertext> query_right(vec_size, 1, random_ctx_vector(all, int(vec_size)));
+            seal::util::matrix<Ciphertext> query_left(1, vec_size, random_ctx_vector(all, int(vec_size)));
+            apply_on_each_element<Ciphertext>(
+                query_right, [&](Ciphertext &c) -> void { all.evaluator.transform_from_ntt_inplace(c); });
+            //            //            seal::util::matrix<Plaintext> db(vec_size, vec_size, random_ptxs(all,
+            //            int(vec_size *
+            //            //            vec_size)));
+            //
+            //            evaluate_matrix<Ciphertext, seal::fractures::EvaluatedCipherPoint>(all, query_right);
+            //            // Create evaluated matrices:
+        }
+    } // namespace polyval
 
     namespace operations
     {
-        TEST(FracturedOps, PolyEvalEquals)
+
+        TEST(FracturedOps, plaintextFracture)
         {
             auto all = SetupObjs::New();
-            seal::fractures::PolynomialEvaluator pe(all.essence);
+            std::uint64_t num_fractures = 256;
 
-            auto ptx = all.random_plaintext();
-            auto ctx = all.random_ciphertext();
+            seal::Ciphertext encrypted_ntt = all.random_ciphertext();
+            auto ptx = all.random_ntt_plaintext();
 
-            seal::Ciphertext res;
-            all.evaluator.multiply_plain(ctx, ptx, res);
-
-            all.evaluator.plain_to_coeff_space(ptx, all.essence.parms.parms_id());
-            auto point1 = pe.evaluate(ptx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
-
-            all.evaluator.transform_from_ntt_inplace(ctx);
-            auto cpoint = pe.evaluate(ctx, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
-
-            all.evaluator.transform_from_ntt_inplace(res);
-            auto rpoint = pe.evaluate(res, std::vector<std::uint64_t>{ 1, 2, 3, 4, 5 });
-
-            cpoint *= point1;
-            // compare:
-            ASSERT_TRUE(cpoint == rpoint);
-            std::cout << "lols" << std::endl;
+            seal::fractures::Polynomial pshredder(ptx, all.context, num_fractures);
+            seal::fractures::CiphertextShredder cshredder(encrypted_ntt, all.context, num_fractures);
         }
 
         TEST(FracturedOps, MultPlain)
@@ -163,8 +115,8 @@ namespace sealtest::fracture
             seal::Ciphertext encrypted_ntt = all.random_ciphertext();
             auto ptx = all.random_ntt_plaintext();
 
-            seal::fractures::CiphertextShredder cshredder(encrypted_ntt, all.essence, num_fractures);
-            seal::fractures::Polynomial pshredder(ptx, all.essence, num_fractures);
+            seal::fractures::CiphertextShredder cshredder(encrypted_ntt, all.context, num_fractures);
+            seal::fractures::Polynomial pshredder(ptx, all.context, num_fractures);
 
             // perform fractured multiplication:
             for (std::uint64_t i = 0; i < num_fractures; ++i)
@@ -191,8 +143,8 @@ namespace sealtest::fracture
             seal::Ciphertext ctx1 = all.random_ciphertext();
             seal::Ciphertext ctx2 = all.random_ciphertext();
 
-            seal::fractures::CiphertextShredder ctxshred1(ctx1, all.essence, num_fractures);
-            seal::fractures::CiphertextShredder ctxshred2(ctx2, all.essence, num_fractures);
+            seal::fractures::CiphertextShredder ctxshred1(ctx1, all.context, num_fractures);
+            seal::fractures::CiphertextShredder ctxshred2(ctx2, all.context, num_fractures);
 
             add_inplace_ctx_fractures(ctxshred1, ctxshred2);
 
@@ -206,23 +158,10 @@ namespace sealtest::fracture
         TEST(FracturedOps, ctxSize3Budget)
         {
             auto all = SetupObjs::New();
-            for (auto i : all.essence.parms.coeff_modulus())
-            {
-                std::cout << i.value() << std::endl;
-            }
 
             auto ptx = all.random_ntt_plaintext();
             auto ctx1 = all.random_ciphertext();
-            //            seal::Plaintext p(all.enc_params.poly_modulus_degree());
 
-            //            for (std::uint64_t i = 0; i < all.enc_params.poly_modulus_degree(); ++i)
-            //            {
-            //                p[i] = 0;
-            //            }
-            //            p[0] = 5;
-
-            //            seal::Ciphertext ctx1;
-            //            all.encryptor.encrypt_symmetric(p, ctx1);
             all.evaluator.multiply_plain_inplace(ctx1, ptx);
             all.evaluator.multiply_inplace(ctx1, ctx1);
 
@@ -241,8 +180,8 @@ namespace sealtest::fracture
             seal::Ciphertext ctx1 = ctxWithSize3(all);
             seal::Ciphertext ctx2 = ctxWithSize3(all);
 
-            seal::fractures::CiphertextShredder ctxshred1(ctx1, all.essence, num_fractures);
-            seal::fractures::CiphertextShredder ctxshred2(ctx2, all.essence, num_fractures);
+            seal::fractures::CiphertextShredder ctxshred1(ctx1, all.context, num_fractures);
+            seal::fractures::CiphertextShredder ctxshred2(ctx2, all.context, num_fractures);
 
             add_inplace_ctx_fractures(ctxshred1, ctxshred2);
 
@@ -261,8 +200,8 @@ namespace sealtest::fracture
             seal::Ciphertext ctx1 = all.random_ciphertext();
             seal::Ciphertext ctx2 = all.random_ciphertext();
 
-            seal::fractures::CiphertextShredder ctxshred1(ctx1, all.essence, num_fractures);
-            seal::fractures::CiphertextShredder ctxshred2(ctx2, all.essence, num_fractures);
+            seal::fractures::CiphertextShredder ctxshred1(ctx1, all.context, num_fractures);
+            seal::fractures::CiphertextShredder ctxshred2(ctx2, all.context, num_fractures);
 
             for (std::uint64_t i = 0; i < num_fractures - 1; ++i)
             {
@@ -284,8 +223,8 @@ namespace sealtest::fracture
             seal::Ciphertext encrypted_ntt = all.random_ciphertext();
             auto ptx = all.random_ntt_plaintext();
 
-            seal::fractures::CiphertextShredder cshredder(encrypted_ntt, all.essence, num_fractures);
-            seal::fractures::Polynomial pshredder(ptx, all.essence, num_fractures);
+            seal::fractures::CiphertextShredder cshredder(encrypted_ntt, all.context, num_fractures);
+            seal::fractures::Polynomial pshredder(ptx, all.context, num_fractures);
 
             // perform fractured multiplication:
             for (std::uint64_t i = 0; i < num_fractures - 1; ++i)
@@ -315,8 +254,8 @@ namespace sealtest::fracture
 
             for (std::uint64_t i = 0; i < std::uint64_t(num_ctxs); ++i)
             {
-                ctxs_fracs.emplace_back(ctxs[i], all.essence, num_fractures);
-                ptxs_fracs.emplace_back(ptxs[i], all.essence, num_fractures);
+                ctxs_fracs.emplace_back(ctxs[i], all.context, num_fractures);
+                ptxs_fracs.emplace_back(ptxs[i], all.context, num_fractures);
             }
 
             // multiply fractured:
@@ -352,8 +291,8 @@ namespace sealtest::fracture
             seal::Ciphertext ctx1 = all.random_ciphertext();
             seal::Ciphertext ctx2 = all.random_ciphertext();
 
-            seal::fractures::CiphertextShredder ctxshred1(ctx1, all.essence, num_fractures);
-            seal::fractures::CiphertextShredder ctxshred2(ctx2, all.essence, num_fractures);
+            seal::fractures::CiphertextShredder ctxshred1(ctx1, all.context, num_fractures);
+            seal::fractures::CiphertextShredder ctxshred2(ctx2, all.context, num_fractures);
 
             seal::Ciphertext expected;
             all.evaluator.multiply(ctx1, ctx2, expected);
@@ -379,8 +318,8 @@ namespace sealtest::fracture
             seal::Ciphertext ctx1 = all.random_ciphertext();
             seal::Ciphertext ctx2 = all.random_ciphertext();
 
-            seal::fractures::CiphertextShredder ctxshred1(ctx1, all.essence, num_fractures);
-            seal::fractures::CiphertextShredder ctxshred2(ctx2, all.essence, num_fractures);
+            seal::fractures::CiphertextShredder ctxshred1(ctx1, all.context, num_fractures);
+            seal::fractures::CiphertextShredder ctxshred2(ctx2, all.context, num_fractures);
 
             all.evaluator.multiply_inplace(ctx1, ctx2);
             all.evaluator.add_inplace(ctx1, ctx1);
@@ -420,7 +359,7 @@ namespace sealtest::fracture
             auto expected = multiplyMatrices(all, left, right);
             std::vector<seal::util::matrix<seal::fractures::CiphertextFracture>> result_fracs;
 
-            seal::fractures::CiphertextShredder result(all.essence, num_fractures);
+            seal::fractures::CiphertextShredder result(all.context, num_fractures);
             for (std::uint64_t i = 0; i < num_fractures; ++i)
             {
                 auto tmp = multiply_matrices(shred_left[i], shred_right[i]);
@@ -447,7 +386,7 @@ namespace sealtest::fracture
             // fill shredders:
             for (auto &ctx : expected)
             {
-                actual.emplace_back(ctx, all.essence, num_fractures);
+                actual.emplace_back(ctx, all.context, num_fractures);
             }
 
             // sum into the first element of the vector.
@@ -474,9 +413,9 @@ namespace sealtest::fracture
             auto ptx = all.random_ntt_plaintext();
             auto ctx2 = all.random_ciphertext();
 
-            seal::fractures::CiphertextShredder ctxshred1(ctx1, all.essence, num_fractures);
-            seal::fractures::Polynomial pshred(ptx, all.essence, num_fractures);
-            seal::fractures::CiphertextShredder ctxshred2(ctx2, all.essence, num_fractures);
+            seal::fractures::CiphertextShredder ctxshred1(ctx1, all.context, num_fractures);
+            seal::fractures::Polynomial pshred(ptx, all.context, num_fractures);
+            seal::fractures::CiphertextShredder ctxshred2(ctx2, all.context, num_fractures);
 
             for (std::uint64_t i = 0; i < num_fractures; ++i)
             {
@@ -501,7 +440,7 @@ namespace sealtest::fracture
         {
             auto all = SetupObjs::New();
 
-            std::uint64_t vec_size = 20;
+            std::uint64_t vec_size = 5;
 
             seal::util::matrix<Ciphertext> query_right(vec_size, 1, random_ctx_vector(all, int(vec_size)));
             seal::util::matrix<Ciphertext> query_left(1, vec_size, random_ctx_vector(all, int(vec_size)));
@@ -512,13 +451,13 @@ namespace sealtest::fracture
             auto response = multiplyMatrices(all, query_left, ctx_vector);
 
             // fracture:
-            std::uint64_t num_fractures = 256;
+            std::uint64_t num_fractures = 8;
             auto frac_query_right = fracture_matrix(all, query_right, num_fractures);
             auto frac_query_left = fracture_matrix(all, query_left, num_fractures);
             auto frac_db = fracture_matrix(all, db, num_fractures);
 
             // multiply:
-            seal::fractures::CiphertextShredder composit(all.essence, num_fractures);
+            seal::fractures::CiphertextShredder composit(all.context, num_fractures);
             for (std::uint64_t i = 0; i < num_fractures; ++i)
             {
                 auto frac_ctx_vector = multiply_matrices(frac_db[i], frac_query_right[i]);
@@ -573,9 +512,10 @@ namespace sealtest::fracture
             {
                 ptx[i] = i % 256;
             }
+
             for (uint64_t i = 4; i <= 1024; i = i * 2)
             {
-                seal::fractures::Polynomial pshredder1(ptx, all.essence, i);
+                seal::fractures::Polynomial pshredder1(ptx, all.context, i);
 
                 for (uint64_t frac = 0; frac < i; ++frac)
                 {
@@ -583,7 +523,7 @@ namespace sealtest::fracture
                     stringstream stream;
                     pf.save(stream);
 
-                    fractures::PolynomialFracture pf2(frac, 0, all.essence.parms.coeff_modulus().size());
+                    fractures::PolynomialFracture pf2(frac, 0, 0);
                     auto st = stream.str();
                     pf2.load((seal::seal_byte *)&st[0], stream.str().length());
                     ASSERT_TRUE(pf2 == pf);
@@ -600,7 +540,7 @@ namespace sealtest::fracture
             prev_size = prev_size << 63;
             for (int i = 4; i <= 1024; i = i * 2)
             {
-                seal::fractures::Polynomial pshredder1(ptx, all.essence, i);
+                seal::fractures::Polynomial pshredder1(ptx, all.context, i);
 
                 stringstream stream1;
                 pshredder1[0].save(stream1);
@@ -618,7 +558,7 @@ namespace sealtest::fracture
 
             std::uint64_t index = gen->generate();
             std::uint64_t coeff_count = gen->generate() % 256;
-            auto modulus = all.essence.parms.coeff_modulus();
+            auto modulus = all.context.first_context_data()->parms().coeff_modulus();
             std::uint64_t num_polys = gen->generate() % 10;
             auto cf = fractures::CiphertextFracture::Empty(num_polys, index, coeff_count, modulus);
             for (std::uint64_t i = 0; i < num_polys; ++i)
