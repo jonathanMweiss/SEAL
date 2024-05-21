@@ -273,24 +273,7 @@ namespace sealtest
         return fractured_matrices;
     }
 
-    void multiply_scalar(
-        const std::vector<std::uint64_t> &a, std::vector<std::uint64_t> &dest,
-        const std::vector<seal::Modulus> &modulus)
-    {
-        if (a.size() != dest.size())
-        {
-            throw std::invalid_argument("multiply_scalar: a and dest must have the same size");
-        }
-        if (a.size() > modulus.size())
-        {
-            throw std::invalid_argument("multiply_scalar: a and modulus must have the same size");
-        }
 
-        for (std::uint64_t i = 0; i < a.size(); ++i)
-        {
-            dest[i] = util::multiply_uint_mod(a[i], dest[i], modulus[i]);
-        }
-    }
     std::string rns_number_to_string(const std::vector<std::uint64_t> &rns_number)
     {
         std::string s;
@@ -368,24 +351,6 @@ namespace sealtest
             }
         }
         return seal::util::matrix<EvaluatedType>(m.rows, m.cols, std::move(inner_vec));
-    }
-
-    std::vector<std::vector<std::uint64_t>> generate_roots(const SetupObjs &all, int num_roots = 1 << 14)
-    {
-        std::vector<std::vector<std::uint64_t>> roots;
-        auto r = root;
-
-        auto mod = all.context.first_context_data()->parms().coeff_modulus();
-        std::vector<std::uint64_t> cur(r);
-        for (int i = 0; i < num_roots; ++i)
-        {
-            if (0 == (i & 1))
-            {
-                roots.push_back({ cur });
-            }
-            multiply_scalar(r, cur, mod);
-        }
-        return roots;
     }
 
     bool random_ctx_ctx_sz(const SetupObjs &all, const vector<std::uint64_t> &r)
