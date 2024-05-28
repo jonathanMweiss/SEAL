@@ -18,6 +18,9 @@ namespace seal::fractures
         std::uint64_t coeff_count;
         seal::util::matrix<std::uint64_t> rns_coefficients;
 
+        // An empty polynomial. used to prepare in advance inside a vector for instance.
+        PolynomialFracture() : fracture_index(0), coeff_count(0), rns_coefficients({ 0, 0, {} }){}
+
         PolynomialFracture(std::uint64_t index, std::uint64_t _coeff_count, std::uint64_t modulus_size)
             : fracture_index(index), coeff_count(_coeff_count), rns_coefficients(coeff_count, modulus_size)
         {}
