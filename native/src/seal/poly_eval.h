@@ -24,6 +24,13 @@ namespace seal::fractures
         {
             return evaluate(p, value);
         }
+
+        EvaluatedPoint evaluate(const seal::Plaintext &p, const std::vector<std::uint64_t> &value) const
+        {
+            seal::Plaintext tmp_cpy(p);
+            return evaluate(tmp_cpy, value);
+        }
+
         EvaluatedPoint evaluate(seal::Plaintext &p, const std::vector<std::uint64_t> &value) const;
 
         EvaluatedCipherPoint evaluate(const seal::Ciphertext &ctx, std::vector<std::uint64_t> &&value) const
