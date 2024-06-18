@@ -193,11 +193,13 @@ namespace seal::fractures
         std::uint64_t a;
         seal::util::try_minimal_primitive_root(n, m, a);
 
+
         // a^(q-1)/n is an n-th root of unity.
         // proof: we know that $a^(q-1)$ is 1 (fermat's little theorem),
         // as a result, $a^k\ne 1$ for all $k < q-1$. otherwise there is a cycle that doesn't go through every
         // element other than 0 in the field, in contradiction to $a$ being a generator/ primitive element.
         // Thus, $w=a^(q-1)/n$ is an n-th root of unity, because w^n = a^(q-1) = 1 and w^k != 1 for all k < n.
+        return a;
         return seal::util::exponentiate_uint_mod(a, (m.value() - 1 / n), m);
     }
 } // namespace seal::fractures
