@@ -1,4 +1,5 @@
 #pragma once
+#include "evaluator.h"
 #include "fractured_ciphertext.h"
 #include "fractured_polynomial.h"
 
