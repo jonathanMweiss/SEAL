@@ -2937,4 +2937,9 @@ namespace seal
             }
         });
     }
+    void Evaluator::transform_to_positive_ntt_inplace(
+        Plaintext &plain, std::uint64_t max_multiplication, parms_id_type parms_id) const
+    {
+        // TODO;
+    }
 } // namespace seal

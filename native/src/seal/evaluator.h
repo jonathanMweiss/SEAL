@@ -74,6 +74,9 @@ namespace seal
     class Evaluator
     {
     public:
+        void transform_to_positive_ntt_inplace(
+            Plaintext &plain, std::uint64_t max_multiplication, parms_id_type parms_id) const;
+
         /**
          * Moves the plaintext into coefficient mod domain.
          * Results in a plaintext with and increased size. matching the coeff_modulus size.

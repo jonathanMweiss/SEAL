@@ -18,7 +18,7 @@ namespace seal::fractures
     class PolynomialEvaluator
     {
     public:
-        PolynomialEvaluator(const SEALContext &ctx) : context(ctx){};
+        PolynomialEvaluator(const SEALContext &ctx) : context(ctx), ev(ctx){};
 
         EvaluatedPoint evaluate(seal::Plaintext &p, std::vector<std::uint64_t> &&value) const
         {
@@ -80,6 +80,7 @@ namespace seal::fractures
             const std::vector<std::uint64_t> &value) const;
 
         SEALContext context;
+        seal::Evaluator ev;
         void validate_value_to_evaluate(
             const std::vector<std::uint64_t> &value, const std::vector<Modulus> &coeff_modulus) const;
     };

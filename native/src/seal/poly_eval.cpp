@@ -4,39 +4,6 @@
 namespace seal::fractures
 {
 
-    /**
-     * methodology taken from evaluator.cpp
-     * Main idea is to move the plaintext from a single modulus representation to the same RNS representation as
-     * used in firstContextData (freshly minted ctx).
-     * @param plain that needed to be changed.
-     */
-    void ramp_up_polynomial(seal::Plaintext &plain, const seal::SEALContext &ctx)
-    {
-        auto &context_data = *ctx.first_context_data();
-        auto &parms = context_data.parms();
-        auto &coeff_modulus = parms.coeff_modulus();
-        size_t coeff_count = parms.poly_modulus_degree();
-        size_t coeff_modulus_size = coeff_modulus.size();
-        size_t plain_coeff_count = plain.coeff_count();
-
-        uint64_t plain_upper_half_threshold = context_data.plain_upper_half_threshold();
-        auto plain_upper_half_increment = context_data.plain_upper_half_increment();
-
-        plain.resize(coeff_count * coeff_modulus_size);
-        seal::util::RNSIter plain_iter(plain.data(), coeff_count);
-
-        auto helper_iter = reverse_iter(plain_iter, plain_upper_half_increment);
-        std::advance(helper_iter, -seal::util::safe_cast<ptrdiff_t>(coeff_modulus_size - 1));
-
-        // ramp up the polynomial to rns.
-        SEAL_ITERATE(helper_iter, coeff_modulus_size, [&](auto I) {
-            SEAL_ITERATE(iter(*plain_iter, std::get<0>(I)), plain_coeff_count, [&](auto J) {
-                std::get<1>(J) = SEAL_COND_SELECT(
-                    std::get<0>(J) >= plain_upper_half_threshold, std::get<0>(J) + std::get<1>(I), std::get<0>(J));
-            });
-        });
-    }
-
     EvaluatedPoint seal::fractures::PolynomialEvaluator::evaluate(
         seal::Plaintext &p, const std::vector<std::uint64_t> &value) const
     {
@@ -54,7 +21,7 @@ namespace seal::fractures
                 "haven't implemented polynomial evaluation without 'using_fast_plain_lift' set to true!.");
         }
 
-        ramp_up_polynomial(p, context);
+        ev.plain_to_coeff_space(p, context.first_parms_id());
 
         auto &parms = ctx_data->parms();
         return evaluate_singe_RNS_polynomial(
@@ -192,7 +159,6 @@ namespace seal::fractures
         // $a^k$ for some $k$.
         std::uint64_t a;
         seal::util::try_minimal_primitive_root(n, m, a);
-
 
         // a^(q-1)/n is an n-th root of unity.
         // proof: we know that $a^(q-1)$ is 1 (fermat's little theorem),
