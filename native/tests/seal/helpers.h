@@ -23,6 +23,11 @@ using namespace seal;
 using namespace std;
 namespace sealtest
 {
+
+    shared_ptr<UniformRandomGenerator> prng();
+
+    seal::Plaintext random_plain(const seal::EncryptionParameters &enc_params);
+
     struct SetupObjs
     {
         seal::EncryptionParameters enc_params;
@@ -67,29 +72,7 @@ namespace sealtest
 
         seal::Plaintext random_plaintext() const
         {
-            seal::Plaintext p(enc_params.poly_modulus_degree());
-
-            // avoiding encoder usage - to prevent unwanted transformation to the ptx underlying elements
-            std::vector<std::uint64_t> v(enc_params.poly_modulus_degree(), 0);
-
-            shared_ptr<UniformRandomGenerator> gen = prng();
-
-            auto mod = enc_params.plain_modulus().value();
-            std::generate(v.begin(), v.end(), [gen = std::move(gen), &mod]() { return gen->generate() % mod; });
-
-            for (std::uint64_t i = 0; i < enc_params.poly_modulus_degree(); ++i)
-            {
-                p[i] = v[i];
-            }
-            return p;
-        }
-
-        shared_ptr<UniformRandomGenerator> prng() const
-        {
-            Blake2xbPRNGFactory factory;
-            array<uint64_t, prng_seed_uint64_count> seed{ 1, 2, 3, 4, 5, 6, 7, 8 };
-            auto gen = factory.create(seed);
-            return gen;
+            return random_plain(enc_params);
         }
 
         seal::Plaintext random_ntt_plaintext() const

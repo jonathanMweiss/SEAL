@@ -504,7 +504,7 @@ namespace sealtest::fracture
         TEST(FracturedOps, serializePolyFrac)
         {
             auto all = SetupObjs::New();
-            auto gen = all.prng();
+            auto gen = prng();
 
             auto index = gen->generate();
             auto coeff_count = gen->generate() % 15;
@@ -580,7 +580,7 @@ namespace sealtest::fracture
         TEST(FracturedOps, serializeCipherFrac)
         {
             auto all = SetupObjs::New();
-            auto gen = all.prng();
+            auto gen = prng();
 
             std::uint64_t index = gen->generate();
             std::uint64_t coeff_count = gen->generate() % 256;

@@ -11,7 +11,6 @@
 #include "seal/modulus.h"
 #include <cstddef>
 #include <cstdint>
-
 #include <ctime>
 #include <string>
 #include "gtest/gtest.h"
@@ -6158,7 +6157,7 @@ namespace sealtest
         SEALContext context(parms, false, sec_level_type::none);
         Evaluator evaluator(context);
 
-        Plaintext ptx("1");
+        Plaintext ptx = random_plain(parms);
 
         evaluator.transform_to_positive_ntt_inplace(ptx, 1, context.first_parms_id());
         // assert correct padding.

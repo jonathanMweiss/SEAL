@@ -233,4 +233,30 @@ namespace sealtest
         return v;
     }
 
+    shared_ptr<UniformRandomGenerator> prng()
+    {
+        Blake2xbPRNGFactory factory;
+        array<uint64_t, prng_seed_uint64_count> seed{ 1, 2, 3, 4, 5, 6, 7, 8 };
+        auto gen = factory.create(seed);
+        return gen;
+    }
+
+    seal::Plaintext random_plain(const EncryptionParameters &enc_params)
+    {
+        seal::Plaintext p(enc_params.poly_modulus_degree());
+
+        // avoiding encoder usage - to prevent unwanted transformation to the ptx underlying elements
+        std::vector<std::uint64_t> v(enc_params.poly_modulus_degree(), 0);
+
+        shared_ptr<UniformRandomGenerator> gen = prng();
+
+        auto mod = enc_params.plain_modulus().value();
+        std::generate(v.begin(), v.end(), [gen = std::move(gen), &mod]() { return gen->generate() % mod; });
+
+        for (std::uint64_t i = 0; i < enc_params.poly_modulus_degree(); ++i)
+        {
+            p[i] = v[i];
+        }
+        return p;
+    }
 } // namespace sealtest
