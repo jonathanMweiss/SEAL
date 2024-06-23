@@ -2942,13 +2942,18 @@ namespace seal
     {
         plain_to_coeff_space(plain, parms_id);
         zero_pad(plain, max_multiplication, parms_id);
+
+        // transform todo.
+
+        plain.parms_id() = parms_id;
     }
 
     // helper function.
-    seal::util::RNSIter make_reverse_rnsPoly_iter(seal::Plaintext &plain, size_t coeff_count, size_t coeff_modulus_size)
+    seal::util::ReverseIter<RNSIter> make_reverse_rnsPoly_iter(
+        seal::Plaintext &plain, size_t coeff_count, size_t coeff_modulus_size)
     {
         seal::util::RNSIter runner(plain.data(), coeff_count);
-        std::advance(runner, coeff_modulus_size - 1);
+        std::advance(runner, coeff_modulus_size);
         auto rns_poly_reversed_order = reverse_iter(runner);
         return rns_poly_reversed_order;
     }
@@ -2967,25 +2972,21 @@ namespace seal
         // resize sets everything with zeros.
         plain.resize(new_poly_coeff_count * coeff_modulus_size);
 
-        seal::util::RNSIter rns_poly_reversed_order = make_reverse_rnsPoly_iter(plain, coeff_count, coeff_modulus_size);
+        auto reg_poly_iter = make_reverse_rnsPoly_iter(plain, coeff_count, coeff_modulus_size);
+        auto padded_poly_iter = make_reverse_rnsPoly_iter(plain, new_poly_coeff_count, coeff_modulus_size);
 
-        seal::util::RNSIter padded_positions_iter(plain.data(), new_poly_coeff_count);
-        std::advance(padded_positions_iter, coeff_modulus_size - 1); // last padded polynomial position.
+        SEAL_ITERATE(seal::util::iter(reg_poly_iter, padded_poly_iter), coeff_modulus_size, [&](auto I) {
+            auto s(std::get<0>(I));
+            auto d(std::get<1>(I));
 
-        SEAL_ITERATE(
-            seal::util::iter(rns_poly_reversed_order, padded_positions_iter), coeff_modulus_size - 1, [&](auto I) {
-                // take the first item from rns_poly and copy it to the current empty position in the padded positions.
-                auto src = std::get<0>(I);
-                auto dst = std::get<1>(I);
-
-                for (std::uint64_t i = 0; i < coeff_count; ++i)
-                {
-                    *dst = *src;
-                    *src = 0;
-                    ++dst;
-                    ++src;
-                }
-            });
+            for (std::uint64_t i = 0; i < coeff_count; ++i)
+            {
+                *d = *s;
+                *s = 0;
+                ++d;
+                ++s;
+            }
+        });
 
         return;
     }
