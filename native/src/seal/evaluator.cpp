@@ -2938,8 +2938,55 @@ namespace seal
         });
     }
     void Evaluator::transform_to_positive_ntt_inplace(
-        Plaintext &plain, std::uint64_t max_multiplication, parms_id_type parms_id) const
+        Plaintext &plain, std::uint64_t max_multiplication, const parms_id_type &parms_id) const
     {
-        // TODO;
+        plain_to_coeff_space(plain, parms_id);
+        zero_pad(plain, max_multiplication, parms_id);
+    }
+
+    // helper function.
+    seal::util::RNSIter make_reverse_rnsPoly_iter(seal::Plaintext &plain, size_t coeff_count, size_t coeff_modulus_size)
+    {
+        seal::util::RNSIter runner(plain.data(), coeff_count);
+        std::advance(runner, coeff_modulus_size - 1);
+        auto rns_poly_reversed_order = reverse_iter(runner);
+        return rns_poly_reversed_order;
+    }
+
+    void Evaluator::zero_pad(
+        Plaintext &plain, std::uint64_t expected_multiplications, const parms_id_type &parms_id) const
+    {
+        auto &context_data = *context_.get_context_data(parms_id);
+        auto &parms = context_data.parms();
+        auto &coeff_modulus = parms.coeff_modulus();
+        size_t coeff_count = parms.poly_modulus_degree();
+        size_t coeff_modulus_size = coeff_modulus.size();
+
+        size_t new_poly_coeff_count =
+            coeff_count * static_cast<uint64_t>(seal::util::exponentiate_uint(2, expected_multiplications));
+        // resize sets everything with zeros.
+        plain.resize(new_poly_coeff_count * coeff_modulus_size);
+
+        seal::util::RNSIter rns_poly_reversed_order = make_reverse_rnsPoly_iter(plain, coeff_count, coeff_modulus_size);
+
+        seal::util::RNSIter padded_positions_iter(plain.data(), new_poly_coeff_count);
+        std::advance(padded_positions_iter, coeff_modulus_size - 1); // last padded polynomial position.
+
+        SEAL_ITERATE(
+            seal::util::iter(rns_poly_reversed_order, padded_positions_iter), coeff_modulus_size - 1, [&](auto I) {
+                // take the first item from rns_poly and copy it to the current empty position in the padded positions.
+                auto src = std::get<0>(I);
+                auto dst = std::get<1>(I);
+
+                for (std::uint64_t i = 0; i < coeff_count; ++i)
+                {
+                    *dst = *src;
+                    *src = 0;
+                    ++dst;
+                    ++src;
+                }
+            });
+
+        return;
     }
 } // namespace seal
