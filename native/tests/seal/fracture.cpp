@@ -19,8 +19,8 @@
 #include <sys/socket.h>
 #include <unordered_set>
 #include <utility>
-#include "frac_test_helpers.cpp"
 #include "gtest/gtest.h"
+#include "helpers.cpp"
 
 using namespace seal;
 using namespace std;
@@ -70,8 +70,8 @@ namespace sealtest::fracture
                 ASSERT_EQ(v[2 * i], 0);
             }
         }
-
     } // namespace regntt
+
     namespace polyval
     {
 
