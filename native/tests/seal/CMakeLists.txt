@@ -3,6 +3,7 @@
 
 target_sources(sealtest
     PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/helpers.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ciphertext.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ckks.cpp
         ${CMAKE_CURRENT_LIST_DIR}/context.cpp

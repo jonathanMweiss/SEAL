@@ -1,6 +1,7 @@
 #pragma once
 
-#include "seal/fractures.h"
+#include "seal/fractured_ciphertext.h"
+#include "seal/fractured_polynomial.h"
 #include <seal/util/polyarithsmallmod.h>
 
 namespace seal::fractures

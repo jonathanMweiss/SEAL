@@ -11,9 +11,11 @@
 #include "seal/modulus.h"
 #include <cstddef>
 #include <cstdint>
+
 #include <ctime>
 #include <string>
 #include "gtest/gtest.h"
+#include "helpers.h"
 
 using namespace seal;
 using namespace std;
@@ -6139,5 +6141,35 @@ namespace sealtest
         decryptor.decrypt(encrypted, plain);
         ASSERT_TRUE(encrypted.parms_id() == parms_id);
         ASSERT_TRUE(plain.to_string() == "5x^64 + Ax^5");
+    }
+
+    TEST(EvaluatorTest, PostiveWrappedNTTPlaintextPadding)
+    {
+        std::uint64_t N = 128;
+        // The common parameters: the plaintext and the polynomial moduli
+        Modulus plain_modulus(65);
+
+        // The parameters and the context of the higher level
+        EncryptionParameters parms(scheme_type::bgv);
+        parms.set_poly_modulus_degree(128);
+        parms.set_plain_modulus(plain_modulus);
+        parms.set_coeff_modulus(CoeffModulus::Create(N, { 30, 30, 30, 30 }));
+
+        SEALContext context(parms, false, sec_level_type::none);
+        Evaluator evaluator(context);
+
+        Plaintext ptx("1");
+
+        evaluator.transform_to_positive_ntt_inplace(ptx, 1, context.first_parms_id());
+        // assert correct padding.
+        ASSERT_EQ(ptx.dyn_array().size(), 2 * 3 * N);
+
+        //        auto v = ptx.dyn_array();
+        auto v = plain_to_vector(ptx);
+        // asserting the padding is of the following form [p_q1, 0 . p_q2, 0 ..]
+        for (auto i = N; i < 2 * N; ++i)
+        {
+            ASSERT_EQ(ptx.dyn_array().at(i), 0);
+        }
     }
 } // namespace sealtest
