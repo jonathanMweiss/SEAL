@@ -16,6 +16,7 @@
 #include <ctime>
 #include <sstream>
 #include <string>
+#include <sys/socket.h>
 #include <unordered_set>
 #include <utility>
 #include "frac_test_helpers.cpp"
@@ -26,6 +27,51 @@ using namespace std;
 namespace sealtest::fracture
 {
 
+    namespace regntt
+    {
+
+        TEST(nonNegacyclicNTT, ctx)
+        {
+            // TODO , test in the evaluator tests..
+            // take the RNS of a specific modulus, then
+            // TRY feeding their "lazy" ntt function with larger values.
+
+            //            GTEST_SKIP();
+        }
+
+        //        std::vector<std::uint64_t> into_vector(const seal::Plaintext &padded, std::uint64_t sz)
+        //        {
+        //            seal::util::ConstRNSIter padded_itr(padded.data(), sz);
+        //            std::vector<std::uint64_t> ret;
+        //            ret.reserve(sz);
+        //
+        //            SEAL_ITERATE(seal::util::iter(padded_itr), 1, [&](auto I) {
+        //                SEAL_ITERATE(I, sz, [&](auto &J) { ret.emplace_back(J); });
+        //            });
+        //            return ret;
+        //        }
+
+        TEST(nonNegacyclicNTT, ptxPadding)
+        {
+            std::uint64_t N = 8192;
+            // TODO , test in the evaluator tests..
+            auto all = SetupObjs::New(N);
+            auto ptx = all.random_plaintext();
+
+            all.evaluator.transform_to_positive_ntt_inplace(ptx, 2, all.context.first_parms_id());
+            auto v = plain_to_vector(ptx);
+            // assert correct padding.
+            ASSERT_EQ(v.size(), 4 * 2 * N);
+
+            // asserting the padding is of the following form [p_q1, 0 . p_q2, 0 ..]
+            for (auto i = N; i < 2 * N; ++i)
+            {
+                ASSERT_EQ(v[i], 0);
+                ASSERT_EQ(v[2 * i], 0);
+            }
+        }
+
+    } // namespace regntt
     namespace polyval
     {
 

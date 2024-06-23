@@ -273,7 +273,6 @@ namespace sealtest
         return fractured_matrices;
     }
 
-
     std::string rns_number_to_string(const std::vector<std::uint64_t> &rns_number)
     {
         std::string s;
@@ -417,6 +416,17 @@ namespace sealtest
         {
             f(elem);
         }
+    }
+
+    std::vector<std::uint64_t> plain_to_vector(const Plaintext &ptx)
+    {
+        std::vector<std::uint64_t> v;
+        v.reserve(ptx.dyn_array().size()); // x4 is for ntt pad. x2 is for modulus size
+        for (std::uint64_t i = 0; i < ptx.dyn_array().size(); ++i)
+        {
+            v.emplace_back(ptx.dyn_array().at(i));
+        }
+        return v;
     }
 
 } // namespace sealtest
