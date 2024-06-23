@@ -16,6 +16,7 @@ target_sources(sealtest
         ${CMAKE_CURRENT_LIST_DIR}/memorymanager.cpp
         ${CMAKE_CURRENT_LIST_DIR}/modulus.cpp
         ${CMAKE_CURRENT_LIST_DIR}/plaintext.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/positive_ntt.cpp
         ${CMAKE_CURRENT_LIST_DIR}/publickey.cpp
         ${CMAKE_CURRENT_LIST_DIR}/randomgen.cpp
         ${CMAKE_CURRENT_LIST_DIR}/randomtostd.cpp
