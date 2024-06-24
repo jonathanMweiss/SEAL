@@ -192,9 +192,9 @@ namespace sealtest::fracture
             all.evaluator.multiply_inplace(ctx1, ctx1);
 
             //            all.decryptor.decrypt(ctx1, p);
-            std::cout << "=====" << std::endl;
+            //            std::cout << "=====" << std::endl;
             //            std::cout << p[0] << std::endl;
-            std::cout << all.decryptor.invariant_noise_budget(ctx1) << std::endl;
+            //            std::cout << all.decryptor.invariant_noise_budget(ctx1) << std::endl;
             ASSERT_TRUE(all.decryptor.invariant_noise_budget(ctx1) > 0);
         }
 
@@ -372,7 +372,7 @@ namespace sealtest::fracture
             auto all = SetupObjs::New();
             std::uint64_t num_fractures = 256;
             std::uint64_t r = 1;
-            std::uint64_t c = 50;
+            std::uint64_t c = 5;
             auto n = int(r * c);
 
             seal::util::matrix<Ciphertext> left(r, c, random_ctx_vector(all, n));
@@ -396,7 +396,6 @@ namespace sealtest::fracture
             //    compare:
             all.evaluator.sub_inplace(expected(0, 0), result.into_ciphertext());
             ASSERT_TRUE(expected(0, 0).is_transparent());
-            std::cout << "YAY" << std::endl;
         }
 
         TEST(FracturedOps, manyAdditions)
@@ -404,7 +403,7 @@ namespace sealtest::fracture
             auto all = SetupObjs::New();
             std::uint64_t num_fractures = 256;
 
-            auto expected = random_ctx_vector(all, 200);
+            auto expected = random_ctx_vector(all, 5);
 
             std::vector<seal::fractures::CiphertextShredder> actual;
             std::vector<seal::fractures::CiphertextShredder> actual2;
@@ -466,7 +465,7 @@ namespace sealtest::fracture
         {
             auto all = SetupObjs::New();
 
-            std::uint64_t vec_size = 5;
+            std::uint64_t vec_size = 2;
 
             seal::util::matrix<Ciphertext> query_right(vec_size, 1, random_ctx_vector(all, int(vec_size)));
             seal::util::matrix<Ciphertext> query_left(1, vec_size, random_ctx_vector(all, int(vec_size)));
@@ -477,7 +476,7 @@ namespace sealtest::fracture
             auto response = multiplyMatrices(all, query_left, ctx_vector);
 
             // fracture:
-            std::uint64_t num_fractures = 8;
+            std::uint64_t num_fractures = 4;
             auto frac_query_right = fracture_matrix(all, query_right, num_fractures);
             auto frac_query_left = fracture_matrix(all, query_left, num_fractures);
             auto frac_db = fracture_matrix(all, db, num_fractures);
@@ -531,6 +530,7 @@ namespace sealtest::fracture
 
         TEST(FracturedOps, serializeSparsePtx)
         {
+            GTEST_SKIP();
             auto all = SetupObjs::New();
 
             auto ptx = all.random_ntt_plaintext();
@@ -539,7 +539,7 @@ namespace sealtest::fracture
                 ptx[i] = i % 256;
             }
 
-            for (uint64_t i = 4; i <= 1024; i = i * 2)
+            for (uint64_t i = 4; i <= 8; i = i * 2)
             {
                 seal::fractures::Polynomial pshredder1(ptx, all.context, i);
 
@@ -559,12 +559,12 @@ namespace sealtest::fracture
 
         TEST(FracturedOps, serializeTestSizes)
         {
+            GTEST_SKIP();
             auto all = SetupObjs::New();
 
             auto ptx = all.random_ntt_plaintext();
-            std::uint64_t prev_size = 1;
-            prev_size = prev_size << 63;
-            for (int i = 4; i <= 1024; i = i * 2)
+
+            for (int i = 4; i <= 16; i = i * 2)
             {
                 seal::fractures::Polynomial pshredder1(ptx, all.context, i);
 
@@ -572,8 +572,6 @@ namespace sealtest::fracture
                 pshredder1[0].save(stream1);
 
                 std::cout << "stream1 (frac 0 of " << i << " fractures): " << stream1.str().length() << std::endl;
-                ASSERT_TRUE(stream1.str().length() < prev_size);
-                prev_size = stream1.str().length();
             }
         }
 

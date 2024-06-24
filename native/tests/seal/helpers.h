@@ -67,8 +67,9 @@ namespace sealtest
         }
 
         explicit SetupObjs(seal::EncryptionParameters encryption_params)
-            : enc_params(std::move(encryption_params)), context(enc_params, true), evaluator(context), keygen(context),
-              secret_key(keygen.secret_key()), encryptor(context, secret_key), decryptor(context, secret_key){};
+            : enc_params(std::move(encryption_params)), context(enc_params, true, sec_level_type::tc192, 2),
+              evaluator(context), keygen(context), secret_key(keygen.secret_key()), encryptor(context, secret_key),
+              decryptor(context, secret_key){};
 
         seal::Plaintext random_plaintext() const
         {
