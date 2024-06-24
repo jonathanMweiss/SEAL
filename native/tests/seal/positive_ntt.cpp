@@ -33,18 +33,19 @@ namespace sealtest
         parms.set_plain_modulus(plain_modulus);
         parms.set_coeff_modulus(CoeffModulus::Create(N, { 30, 30, 30, 30 }));
 
-        SEALContext context(parms, false, sec_level_type::none);
+        SEALContext context(parms, false, sec_level_type::none, 2);
         Evaluator evaluator(context);
 
         Plaintext ptx = random_plain(parms);
+        evaluator.plain_to_coeff_space(ptx, context.first_parms_id());
         Plaintext cpy = ptx;
-        evaluator.transform_to_positive_ntt_inplace(ptx, 2, context.first_parms_id());
-        evaluator.plain_to_coeff_space(cpy, context.first_parms_id());
+
+        evaluator.zero_pad(ptx, context.first_parms_id());
 
         // assert correct padding.
         ASSERT_EQ(ptx.dyn_array().size(), 4 * 3 * N); // 4x is from the padding, 3x is from the number of moduli.
-
         ASSERT_TRUE(ptx.coeff_count() != cpy.coeff_count());
+
         seal::util::RNSIter ptx_itr(ptx.data(), N * 4);
         seal::util::RNSIter cpy_itr(cpy.data(), N);
         SEAL_ITERATE(

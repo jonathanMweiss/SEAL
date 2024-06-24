@@ -2860,15 +2860,14 @@ namespace seal
         });
     }
 
-    void Evaluator::transform_to_positive_ntt_inplace(
-        Plaintext &plain, std::uint64_t max_multiplication, const parms_id_type &parms_id) const
+    void Evaluator::transform_to_positive_ntt_inplace(Plaintext &plain, const parms_id_type &parms_id) const
     {
         plain_to_coeff_space(plain, parms_id);
-        zero_pad(plain, max_multiplication, parms_id);
+        zero_pad(plain, parms_id);
 
         // transform todo.
 
-        plain.parms_id() = parms_id;
+        plain.parms_id() = context_.positive_wrapped_parms_id();
     }
 
     void Evaluator::transform_to_positive_ntt_inplace(Ciphertext &encrypted, std::uint64_t max_multiplication) const
@@ -2928,9 +2927,13 @@ namespace seal
         return rns_poly_reversed_order;
     }
 
-    void Evaluator::zero_pad(
-        Plaintext &plain, std::uint64_t expected_multiplications, const parms_id_type &parms_id) const
+    void Evaluator::zero_pad(Plaintext &plain, const parms_id_type &parms_id) const
     {
+        if (parms_id != context_.first_parms_id())
+        {
+            throw invalid_argument("not supporting multiple parms_id for postivie_wrapped convolution.");
+        }
+
         auto &context_data = *context_.get_context_data(parms_id);
         auto &parms = context_data.parms();
         auto &coeff_modulus = parms.coeff_modulus();
@@ -2938,7 +2941,7 @@ namespace seal
         size_t coeff_modulus_size = coeff_modulus.size();
 
         size_t new_poly_coeff_count =
-            coeff_count * static_cast<uint64_t>(seal::util::exponentiate_uint(2, expected_multiplications));
+            context_.get_context_data(context_.positive_wrapped_parms_id())->parms().poly_modulus_degree();
         // resize sets everything with zeros.
         plain.resize(new_poly_coeff_count * coeff_modulus_size);
 
@@ -2961,6 +2964,17 @@ namespace seal
         return;
     }
 
-    void Evaluator::zero_pad(Ciphertext ciphertext, uint64_t total_multiplications) const
-    {}
+    void Evaluator::zero_pad(Ciphertext encrypted, uint64_t total_multiplications) const
+    {
+        if (encrypted.parms_id() != context_.first_parms_id())
+        {
+            throw invalid_argument("not supporting multiple parms_id for postivie_wrapped convolution.");
+        }
+
+        encrypted.resize(context_, context_.positive_wrapped_parms_id(), encrypted.size());
+        // resize changes the data's inner size to be: total_multiplications *
+        // poly_degree * coeff_modulus_size. Thus, the new size should be enough to hold all the polynomials.
+        //        ciphertext.resize(total_multiplications);
+        //        ConstPolyIter(encrypted1.data(), coeff_count, coeff_modulus_size)
+    }
 } // namespace seal

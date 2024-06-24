@@ -73,19 +73,16 @@ namespace seal
     */
     class Evaluator
     {
+    public:
         /**
          * pads each polynomial with zeros in preparation for positive-cyclic NTT.
          */
-        void zero_pad(Plaintext &plain, std::uint64_t expected_multiplications, const parms_id_type &parms_id) const;
-
-    public:
+        void zero_pad(Plaintext &plain, const parms_id_type &parms_id) const;
         /**
          * Transform to NTT, but instead of using negacyclic-ntt, uses conventional NTT, with padding.
          * Modifies the given plaintext, and attempts to reallocate its data. if possible avoids copying.
          */
-        void transform_to_positive_ntt_inplace(
-            Plaintext &plain, std::uint64_t max_multiplication, const parms_id_type &parms_id) const;
-
+        void transform_to_positive_ntt_inplace(Plaintext &plain, const parms_id_type &parms_id) const;
 
         /**
          * Transform to NTT, but instead of using negacyclic-ntt, uses conventional NTT, with padding.
@@ -96,11 +93,10 @@ namespace seal
         /**
          * Transform to NTT, but instead of using negacyclic-ntt, uses conventional NTT, with padding.
          */
-        Plaintext transform_to_positive_ntt(
-            const Plaintext &plain, std::uint64_t max_multiplication, const parms_id_type &parms_id)
+        Plaintext transform_to_positive_ntt(const Plaintext &plain, const parms_id_type &parms_id)
         {
             Plaintext cpy = plain;
-            transform_to_positive_ntt_inplace(cpy, max_multiplication, parms_id);
+            transform_to_positive_ntt_inplace(cpy, parms_id);
             return plain;
         }
 
