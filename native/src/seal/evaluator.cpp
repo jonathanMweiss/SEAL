@@ -2171,7 +2171,8 @@ namespace seal
         }
     }
 
-    void Evaluator::plain_to_coeff_space(Plaintext &plain, parms_id_type parms_id, MemoryPoolHandle pool) const
+    void Evaluator::validate_plaintext_parameters(
+        const Plaintext &plain, const parms_id_type &parms_id, MemoryPoolHandle pool) const
     {
         // Verify parameters.
         if (!is_valid_for(plain, context_))
@@ -2192,8 +2193,13 @@ namespace seal
         {
             throw invalid_argument("pool is uninitialized");
         }
+    }
 
+    void Evaluator::plain_to_coeff_space(Plaintext &plain, parms_id_type parms_id, MemoryPoolHandle pool) const
+    {
+        validate_plaintext_parameters(plain, parms_id, pool);
         // Extract encryption parameters.
+        auto context_data_ptr = context_.get_context_data(parms_id);
         auto &context_data = *context_data_ptr;
         auto &parms = context_data.parms();
         auto &coeff_modulus = parms.coeff_modulus();
@@ -2292,91 +2298,19 @@ namespace seal
 
     void Evaluator::transform_to_ntt_inplace(Plaintext &plain, parms_id_type parms_id, MemoryPoolHandle pool) const
     {
-        // Verify parameters.
-        if (!is_valid_for(plain, context_))
-        {
-            throw invalid_argument("plain is not valid for encryption parameters");
-        }
-
-        auto context_data_ptr = context_.get_context_data(parms_id);
-        if (!context_data_ptr)
-        {
-            throw invalid_argument("parms_id is not valid for the current context");
-        }
-        if (plain.is_ntt_form())
-        {
-            throw invalid_argument("plain is already in NTT form");
-        }
-        if (!pool)
-        {
-            throw invalid_argument("pool is uninitialized");
-        }
+        validate_plaintext_parameters(plain, parms_id, pool);
 
         // Extract encryption parameters.
+        auto context_data_ptr = context_.get_context_data(parms_id);
         auto &context_data = *context_data_ptr;
         auto &parms = context_data.parms();
-        auto &coeff_modulus = parms.coeff_modulus();
         size_t coeff_count = parms.poly_modulus_degree();
-        size_t coeff_modulus_size = coeff_modulus.size();
-        size_t plain_coeff_count = plain.coeff_count();
-
-        uint64_t plain_upper_half_threshold = context_data.plain_upper_half_threshold();
-        auto plain_upper_half_increment = context_data.plain_upper_half_increment();
+        size_t coeff_modulus_size = parms.coeff_modulus().size();
 
         auto ntt_tables = iter(context_data.small_ntt_tables());
+        plain_to_coeff_space(plain, parms_id, pool);
 
-        // Size check
-        if (!product_fits_in(coeff_count, coeff_modulus_size))
-        {
-            throw logic_error("invalid parameters");
-        }
-
-        // Resize to fit the entire NTT transformed (ciphertext size) polynomial
-        // Note that the new coefficients are automatically set to 0
-        plain.resize(coeff_count * coeff_modulus_size);
         RNSIter plain_iter(plain.data(), coeff_count);
-
-        if (!context_data.qualifiers().using_fast_plain_lift)
-        {
-            // Allocate temporary space for an entire RNS polynomial
-            // Slight semantic misuse of RNSIter here, but this works well
-            SEAL_ALLOCATE_ZERO_GET_RNS_ITER(temp, coeff_modulus_size, coeff_count, pool);
-
-            SEAL_ITERATE(iter(plain.data(), temp), plain_coeff_count, [&](auto I) {
-                auto plain_value = get<0>(I);
-                if (plain_value >= plain_upper_half_threshold)
-                {
-                    add_uint(plain_upper_half_increment, coeff_modulus_size, plain_value, get<1>(I));
-                }
-                else
-                {
-                    *get<1>(I) = plain_value;
-                }
-            });
-
-            context_data.rns_tool()->base_q()->decompose_array(temp, coeff_count, pool);
-
-            // Copy data back to plain
-            set_poly(temp, coeff_count, coeff_modulus_size, plain.data());
-        }
-        else
-        {
-            // Note that in this case plain_upper_half_increment holds its value in RNS form modulo the coeff_modulus
-            // primes.
-
-            // Create a "reversed" helper iterator that iterates in the reverse order both plain RNS components and
-            // the plain_upper_half_increment values.
-            auto helper_iter = reverse_iter(plain_iter, plain_upper_half_increment);
-            advance(helper_iter, -safe_cast<ptrdiff_t>(coeff_modulus_size - 1));
-
-            SEAL_ITERATE(helper_iter, coeff_modulus_size, [&](auto I) {
-                SEAL_ITERATE(iter(*plain_iter, get<0>(I)), plain_coeff_count, [&](auto J) {
-                    get<1>(J) =
-                        SEAL_COND_SELECT(get<0>(J) >= plain_upper_half_threshold, get<0>(J) + get<1>(I), get<0>(J));
-                });
-            });
-        }
-
         // Transform to NTT domain
         ntt_negacyclic_harvey(plain_iter, coeff_modulus_size, ntt_tables);
 
@@ -2385,23 +2319,11 @@ namespace seal
 
     void Evaluator::transform_to_ntt_inplace(Ciphertext &encrypted) const
     {
-        // Verify parameters.
-        if (!is_metadata_valid_for(encrypted, context_) || !is_buffer_valid(encrypted))
-        {
-            throw invalid_argument("encrypted is not valid for encryption parameters");
-        }
-
-        auto context_data_ptr = context_.get_context_data(encrypted.parms_id());
-        if (!context_data_ptr)
-        {
-            throw invalid_argument("encrypted is not valid for encryption parameters");
-        }
-        if (encrypted.is_ntt_form())
-        {
-            throw invalid_argument("encrypted is already in NTT form");
-        }
+        verify_ciphertext_parameters(encrypted);
 
         // Extract encryption parameters.
+        auto context_data_ptr = context_.get_context_data(encrypted.parms_id());
+
         auto &context_data = *context_data_ptr;
         auto &parms = context_data.parms();
         auto &coeff_modulus = parms.coeff_modulus();
@@ -2937,6 +2859,7 @@ namespace seal
             }
         });
     }
+
     void Evaluator::transform_to_positive_ntt_inplace(
         Plaintext &plain, std::uint64_t max_multiplication, const parms_id_type &parms_id) const
     {
@@ -2946,6 +2869,53 @@ namespace seal
         // transform todo.
 
         plain.parms_id() = parms_id;
+    }
+
+    void Evaluator::transform_to_positive_ntt_inplace(Ciphertext &encrypted, std::uint64_t max_multiplication) const
+    {
+        verify_ciphertext_parameters(encrypted);
+
+        // Extract encryption parameters.
+        auto context_data_ptr = context_.get_context_data(encrypted.parms_id());
+        auto &context_data = *context_data_ptr;
+        auto &parms = context_data.parms();
+        auto &coeff_modulus = parms.coeff_modulus();
+        size_t coeff_count = parms.poly_modulus_degree();
+        size_t coeff_modulus_size = coeff_modulus.size();
+        size_t encrypted_size = encrypted.size();
+
+        auto ntt_tables = iter(context_data.small_ntt_tables());
+
+        // TODO: zero pad the encrypted.
+        zero_pad(encrypted, max_multiplication);
+        // Size check
+        if (!product_fits_in(coeff_count, coeff_modulus_size))
+        {
+            throw logic_error("invalid parameters");
+        }
+
+        // Transform each polynomial to NTT domain
+        ntt_negacyclic_harvey(encrypted, encrypted_size, ntt_tables);
+
+        // Finally change the is_ntt_transformed flag
+        encrypted.is_ntt_form() = true;
+    }
+    void Evaluator::verify_ciphertext_parameters(Ciphertext &encrypted) const
+    { // Verify parameters.
+        if (!is_metadata_valid_for(encrypted, context_) || !is_buffer_valid(encrypted))
+        {
+            throw invalid_argument("encrypted is not valid for encryption parameters");
+        }
+
+        auto context_data_ptr = context_.get_context_data(encrypted.parms_id());
+        if (!context_data_ptr)
+        {
+            throw invalid_argument("encrypted is not valid for encryption parameters");
+        }
+        if (encrypted.is_ntt_form())
+        {
+            throw invalid_argument("encrypted is already in NTT form");
+        }
     }
 
     // helper function.
@@ -2990,4 +2960,7 @@ namespace seal
 
         return;
     }
+
+    void Evaluator::zero_pad(Ciphertext ciphertext, uint64_t total_multiplications) const
+    {}
 } // namespace seal

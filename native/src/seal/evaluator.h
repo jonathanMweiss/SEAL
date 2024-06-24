@@ -82,14 +82,19 @@ namespace seal
         /**
          * Transform to NTT, but instead of using negacyclic-ntt, uses conventional NTT, with padding.
          * Modifies the given plaintext, and attempts to reallocate its data. if possible avoids copying.
-         * @return
          */
         void transform_to_positive_ntt_inplace(
             Plaintext &plain, std::uint64_t max_multiplication, const parms_id_type &parms_id) const;
 
+
         /**
          * Transform to NTT, but instead of using negacyclic-ntt, uses conventional NTT, with padding.
-         * @return
+         * Modifies the given plaintext, and attempts to reallocate its data. if possible avoids copying.
+         */
+        void transform_to_positive_ntt_inplace(Ciphertext &encrypted, uint64_t max_multiplication) const;
+
+        /**
+         * Transform to NTT, but instead of using negacyclic-ntt, uses conventional NTT, with padding.
          */
         Plaintext transform_to_positive_ntt(
             const Plaintext &plain, std::uint64_t max_multiplication, const parms_id_type &parms_id)
@@ -1400,5 +1405,9 @@ namespace seal
         void multiply_plain_ntt(Ciphertext &encrypted_ntt, const Plaintext &plain_ntt) const;
 
         SEALContext context_;
+        void zero_pad(Ciphertext ciphertext, uint64_t total_multiplications) const;
+        void validate_plaintext_parameters(
+            const Plaintext &plain, const parms_id_type &parms_id, MemoryPoolHandle pool) const;
+        void verify_ciphertext_parameters(Ciphertext &encrypted) const;
     };
 } // namespace seal
