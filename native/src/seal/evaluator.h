@@ -1401,7 +1401,7 @@ namespace seal
         void multiply_plain_ntt(Ciphertext &encrypted_ntt, const Plaintext &plain_ntt) const;
 
         SEALContext context_;
-        void zero_pad(Ciphertext ciphertext, uint64_t total_multiplications) const;
+        void zero_pad(Ciphertext ciphertext) const;
         void validate_plaintext_parameters(
             const Plaintext &plain, const parms_id_type &parms_id, MemoryPoolHandle pool) const;
         void verify_ciphertext_parameters(Ciphertext &encrypted) const;

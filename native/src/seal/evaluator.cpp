@@ -2886,7 +2886,7 @@ namespace seal
         auto ntt_tables = iter(context_data.small_ntt_tables());
 
         // TODO: zero pad the encrypted.
-        zero_pad(encrypted, max_multiplication);
+        zero_pad(encrypted);
         // Size check
         if (!product_fits_in(coeff_count, coeff_modulus_size))
         {
@@ -2918,13 +2918,11 @@ namespace seal
     }
 
     // helper function.
-    seal::util::ReverseIter<RNSIter> make_reverse_rnsPoly_iter(
-        seal::Plaintext &plain, size_t coeff_count, size_t coeff_modulus_size)
+    template <typename T>
+    seal::util::ReverseIter<T> reverse_from_pos(T iter, size_t pos)
     {
-        seal::util::RNSIter runner(plain.data(), coeff_count);
-        std::advance(runner, coeff_modulus_size);
-        auto rns_poly_reversed_order = reverse_iter(runner);
-        return rns_poly_reversed_order;
+        std::advance(iter, pos);
+        return seal::util::ReverseIter<T>(iter);
     }
 
     void Evaluator::zero_pad(Plaintext &plain, const parms_id_type &parms_id) const
@@ -2940,38 +2938,62 @@ namespace seal
         size_t coeff_count = parms.poly_modulus_degree();
         size_t coeff_modulus_size = coeff_modulus.size();
 
-        size_t new_poly_coeff_count =
+        size_t padded_polys_coeff_count =
             context_.get_context_data(context_.positive_wrapped_parms_id())->parms().poly_modulus_degree();
         // resize sets everything with zeros.
-        plain.resize(new_poly_coeff_count * coeff_modulus_size);
+        plain.resize(padded_polys_coeff_count * coeff_modulus_size);
 
-        auto reg_poly_iter = make_reverse_rnsPoly_iter(plain, coeff_count, coeff_modulus_size);
-        auto padded_poly_iter = make_reverse_rnsPoly_iter(plain, new_poly_coeff_count, coeff_modulus_size);
+        auto reg_poly_iter = reverse_from_pos(seal::util::RNSIter(plain.data(), coeff_count), coeff_modulus_size);
+
+        auto padded_poly_iter =
+            reverse_from_pos(seal::util::RNSIter(plain.data(), padded_polys_coeff_count), coeff_modulus_size);
 
         SEAL_ITERATE(seal::util::iter(reg_poly_iter, padded_poly_iter), coeff_modulus_size, [&](auto I) {
-            auto s(std::get<0>(I));
-            auto d(std::get<1>(I));
+            std::uint64_t *s_ptr = std::get<0>(I).ptr();
+            std::uint64_t *d_ptr = std::get<1>(I).ptr();
 
             for (std::uint64_t i = 0; i < coeff_count; ++i)
             {
-                *d = *s;
-                *s = 0;
-                ++d;
-                ++s;
+                *d_ptr = *s_ptr;
+                *s_ptr = 0;
+                ++d_ptr;
+                ++s_ptr;
             }
         });
 
         return;
     }
 
-    void Evaluator::zero_pad(Ciphertext encrypted, uint64_t total_multiplications) const
+    void Evaluator::zero_pad(Ciphertext encrypted) const
     {
         if (encrypted.parms_id() != context_.first_parms_id())
         {
             throw invalid_argument("not supporting multiple parms_id for postivie_wrapped convolution.");
         }
+        auto &first_ctx = *context_.get_context_data(context_.first_parms_id());
 
-        encrypted.resize(context_, context_.positive_wrapped_parms_id(), encrypted.size());
+        auto postive_wrapped_parms_id = context_.positive_wrapped_parms_id();
+
+        // allocates at the end of the encrypted enough space to hold all the polynomials.
+        encrypted.resize(context_, postive_wrapped_parms_id, encrypted.size());
+
+        auto &ctx_data = *context_.get_context_data(postive_wrapped_parms_id);
+        auto &parms = ctx_data.parms();
+        auto &coeff_modulus = parms.coeff_modulus();
+        size_t padded_coeff_count = parms.poly_modulus_degree();
+        size_t coeff_modulus_size = coeff_modulus.size();
+
+        // iterators to iterate in reverse.
+        auto reg_itr = reverse_from_pos(
+            seal::util::PolyIter(encrypted.data(), first_ctx.parms().poly_modulus_degree(), coeff_modulus_size),
+            encrypted.size());
+        auto padded_itr = reverse_from_pos(
+            seal::util::PolyIter(encrypted.data(), padded_coeff_count, coeff_modulus_size), encrypted.size());
+
+        SEAL_ITERATE(seal::util::iter(reg_itr, padded_itr), coeff_modulus_size, [&](auto I) {
+
+        });
+
         // resize changes the data's inner size to be: total_multiplications *
         // poly_degree * coeff_modulus_size. Thus, the new size should be enough to hold all the polynomials.
         //        ciphertext.resize(total_multiplications);
