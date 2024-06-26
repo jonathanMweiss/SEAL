@@ -2925,6 +2925,36 @@ namespace seal
         return seal::util::ReverseIter<T>(iter);
     }
 
+    // TODO: add doc:
+    void Evaluator::pad_polynomial(
+        std::uint64_t *src, std::uint64_t *dst, size_t coeff_count, size_t coeff_modulus_size,
+        size_t padded_polys_coeff_count) const
+    {
+        ReverseIter<RNSIter> reg_poly_iter =
+            reverse_from_pos(seal::util::RNSIter(src, coeff_count), coeff_modulus_size);
+
+        ReverseIter<RNSIter> padded_poly_iter =
+            reverse_from_pos(seal::util::RNSIter(dst, padded_polys_coeff_count), coeff_modulus_size);
+
+        SEAL_ITERATE(
+            seal::util::iter(reg_poly_iter, padded_poly_iter), coeff_modulus_size,
+            [&](tuple<PtrIter<uint64_t *>, PtrIter<uint64_t *>> I) {
+                std::uint64_t *s_ptr = std::get<0>(I).ptr();
+                std::uint64_t *d_ptr = std::get<1>(I).ptr();
+
+                // TODO: using memcpy causes a bug. maybe ask yossi.
+                //            memcpy(d_ptr, s_ptr, coeff_count);
+                //            memset(s_ptr, 0, coeff_count);
+                for (std::uint64_t i = 0; i < coeff_count; ++i)
+                {
+                    *d_ptr = *s_ptr;
+                    *s_ptr = 0;
+                    ++d_ptr;
+                    ++s_ptr;
+                }
+            });
+    }
+
     void Evaluator::zero_pad(Plaintext &plain, const parms_id_type &parms_id) const
     {
         if (parms_id != context_.first_parms_id())
@@ -2943,28 +2973,13 @@ namespace seal
         // resize sets everything with zeros.
         plain.resize(padded_polys_coeff_count * coeff_modulus_size);
 
-        auto reg_poly_iter = reverse_from_pos(seal::util::RNSIter(plain.data(), coeff_count), coeff_modulus_size);
-
-        auto padded_poly_iter =
-            reverse_from_pos(seal::util::RNSIter(plain.data(), padded_polys_coeff_count), coeff_modulus_size);
-
-        SEAL_ITERATE(seal::util::iter(reg_poly_iter, padded_poly_iter), coeff_modulus_size, [&](auto I) {
-            std::uint64_t *s_ptr = std::get<0>(I).ptr();
-            std::uint64_t *d_ptr = std::get<1>(I).ptr();
-
-            for (std::uint64_t i = 0; i < coeff_count; ++i)
-            {
-                *d_ptr = *s_ptr;
-                *s_ptr = 0;
-                ++d_ptr;
-                ++s_ptr;
-            }
-        });
-
+        std::uint64_t *bgin = plain.data();
+        // from same location to the same location. but padded.
+        pad_polynomial(bgin, bgin, coeff_count, coeff_modulus_size, padded_polys_coeff_count);
         return;
     }
 
-    void Evaluator::zero_pad(Ciphertext encrypted) const
+    void Evaluator::zero_pad(Ciphertext &encrypted) const
     {
         if (encrypted.parms_id() != context_.first_parms_id())
         {
@@ -2990,13 +3005,16 @@ namespace seal
         auto padded_itr = reverse_from_pos(
             seal::util::PolyIter(encrypted.data(), padded_coeff_count, coeff_modulus_size), encrypted.size());
 
-        SEAL_ITERATE(seal::util::iter(reg_itr, padded_itr), coeff_modulus_size, [&](auto I) {
+        seal::util::RNSIter pp(encrypted.data(), padded_coeff_count);
+        SEAL_ITERATE(seal::util::iter(reg_itr, padded_itr), coeff_modulus_size, [&](tuple<RNSIter, RNSIter> I) {
+            // now need to write a single polynomial to the new padded location.
 
+            std::uint64_t *s_ptr = *std::get<0>(I);
+            std::uint64_t *d_ptr = *std::get<1>(I);
+
+            // copy the polynomial to the new location.
+            pad_polynomial(
+                s_ptr, d_ptr, first_ctx.parms().poly_modulus_degree(), coeff_modulus_size, padded_coeff_count);
         });
-
-        // resize changes the data's inner size to be: total_multiplications *
-        // poly_degree * coeff_modulus_size. Thus, the new size should be enough to hold all the polynomials.
-        //        ciphertext.resize(total_multiplications);
-        //        ConstPolyIter(encrypted1.data(), coeff_count, coeff_modulus_size)
     }
 } // namespace seal

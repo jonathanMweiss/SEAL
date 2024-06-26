@@ -78,6 +78,8 @@ namespace seal
          * pads each polynomial with zeros in preparation for positive-cyclic NTT.
          */
         void zero_pad(Plaintext &plain, const parms_id_type &parms_id) const;
+        void zero_pad(Ciphertext &encrypted) const;
+
         /**
          * Transform to NTT, but instead of using negacyclic-ntt, uses conventional NTT, with padding.
          * Modifies the given plaintext, and attempts to reallocate its data. if possible avoids copying.
@@ -1401,9 +1403,12 @@ namespace seal
         void multiply_plain_ntt(Ciphertext &encrypted_ntt, const Plaintext &plain_ntt) const;
 
         SEALContext context_;
-        void zero_pad(Ciphertext ciphertext) const;
         void validate_plaintext_parameters(
             const Plaintext &plain, const parms_id_type &parms_id, MemoryPoolHandle pool) const;
         void verify_ciphertext_parameters(Ciphertext &encrypted) const;
+
+        void pad_polynomial(
+            std::uint64_t *src, std::uint64_t *dst, size_t coeff_count, size_t coeff_modulus_size,
+            size_t padded_polys_coeff_count) const;
     };
 } // namespace seal
