@@ -137,4 +137,66 @@ namespace sealtest
                 });
             });
     }
+
+    TEST(EvaluatorTest, multiplicationWithPositiveNtt)
+    {
+        std::uint64_t N = 8192;
+        seal::EncryptionParameters parms(seal::scheme_type::bgv);
+
+        parms.set_poly_modulus_degree(N);
+        //            enc.set_coeff_modulus(seal::CoeffModulus::BFVDefault(N, sec_level_type::tc192));
+
+        auto tmp = std::vector<int>{ 54, 41, 42 };
+        auto o = seal::CoeffModulus::Create(N, tmp);
+        parms.set_coeff_modulus(o);
+        parms.set_plain_modulus(seal::PlainModulus::Batching(N, 16 + 1));
+
+        SEALContext context(parms, false, sec_level_type::none, 1);
+        Evaluator evaluator(context);
+
+        Plaintext ptx("2"); //(parms);
+
+        // creating encryption:
+        KeyGenerator keygen(context);
+        SecretKey secret_key = keygen.secret_key();
+        PublicKey pk;
+        keygen.create_public_key(pk);
+        Encryptor encryptor(context, pk);
+        Decryptor decryptor(context, keygen.secret_key());
+
+        Ciphertext ctx(context);
+        encryptor.encrypt(ptx, ctx);
+        evaluator.transform_from_ntt_inplace(ctx);
+
+        // multiplying them:
+        ptx = evaluator.transform_to_positive_ntt(ptx);
+        ctx = evaluator.transform_to_positive_ntt(ctx);
+
+        seal::Ciphertext dst;
+        evaluator.multiply_plain(ctx, ptx, dst);
+
+        // Testsing for correct values after multiplying. (ptx after ntt = [2,2,2,2,2.....,2]
+        auto positive_wrapped_params = context.get_context_data(context.positive_wrapped_parms_id())->parms();
+        // Create poly_iter
+        seal::util::PolyIter s_itr(ctx);
+        seal::util::PolyIter d_itr(dst);
+        SEAL_ITERATE(
+            seal::util::iter(s_itr, d_itr), ctx.size(), [&](tuple<seal::util::RNSIter, seal::util::RNSIter> I) {
+                std::uint64_t mod_index = 0;
+                SEAL_ITERATE(
+                    seal::util::iter(std::get<0>(I), std::get<1>(I)), positive_wrapped_params.coeff_modulus().size(),
+                    [&](auto coefItersJ) {
+                        auto mod = parms.coeff_modulus().at(mod_index++);
+                        auto s(std::get<0>(coefItersJ));
+                        auto double_s(std::get<1>(coefItersJ));
+
+                        for (std::uint64_t i = 0; i < positive_wrapped_params.poly_modulus_degree(); ++i)
+                        {
+                            auto expected_value = seal::util::multiply_uint_mod(*s, 2, mod);
+                            ASSERT_EQ(expected_value, *double_s);
+                        }
+                    });
+            });
+    }
+
 } // namespace sealtest

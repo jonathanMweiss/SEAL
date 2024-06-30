@@ -2860,22 +2860,32 @@ namespace seal
         });
     }
 
-    void Evaluator::transform_to_positive_ntt_inplace(Plaintext &plain, const parms_id_type &parms_id) const
+    void Evaluator::transform_to_positive_ntt_inplace(Plaintext &plain) const
     {
-        plain_to_coeff_space(plain, parms_id);
-        zero_pad(plain, parms_id);
+        plain_to_coeff_space(plain, context_.first_parms_id());
+        zero_pad(plain, context_.first_parms_id());
 
-        // transform todo.
+        auto &c_data = *context_.get_context_data(context_.positive_wrapped_parms_id());
+
+        auto ntt_tables = iter(c_data.small_ntt_tables());
+
+        RNSIter plain_iter(plain.data(), c_data.parms().poly_modulus_degree());
+        // Transform to NTT domain
+        ntt_negacyclic_harvey(plain_iter, c_data.parms().coeff_modulus().size(), ntt_tables);
 
         plain.parms_id() = context_.positive_wrapped_parms_id();
     }
 
-    void Evaluator::transform_to_positive_ntt_inplace(Ciphertext &encrypted, std::uint64_t max_multiplication) const
+    void Evaluator::transform_to_positive_ntt_inplace(Ciphertext &encrypted) const
     {
         verify_ciphertext_parameters(encrypted);
+        if (encrypted.parms_id() != context_.first_parms_id())
+        {
+            throw invalid_argument("supporting postive wrapped nnt params only for first params.");
+        }
 
         // Extract encryption parameters.
-        auto context_data_ptr = context_.get_context_data(encrypted.parms_id());
+        auto context_data_ptr = context_.get_context_data(context_.positive_wrapped_parms_id());
         auto &context_data = *context_data_ptr;
         auto &parms = context_data.parms();
         auto &coeff_modulus = parms.coeff_modulus();
@@ -2898,6 +2908,7 @@ namespace seal
 
         // Finally change the is_ntt_transformed flag
         encrypted.is_ntt_form() = true;
+        encrypted.parms_id() = context_.positive_wrapped_parms_id();
     }
     void Evaluator::verify_ciphertext_parameters(Ciphertext &encrypted) const
     { // Verify parameters.

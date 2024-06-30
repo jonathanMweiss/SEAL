@@ -84,22 +84,27 @@ namespace seal
          * Transform to NTT, but instead of using negacyclic-ntt, uses conventional NTT, with padding.
          * Modifies the given plaintext, and attempts to reallocate its data. if possible avoids copying.
          */
-        void transform_to_positive_ntt_inplace(Plaintext &plain, const parms_id_type &parms_id) const;
+        void transform_to_positive_ntt_inplace(Plaintext &plain) const;
 
         /**
          * Transform to NTT, but instead of using negacyclic-ntt, uses conventional NTT, with padding.
          * Modifies the given plaintext, and attempts to reallocate its data. if possible avoids copying.
          */
-        void transform_to_positive_ntt_inplace(Ciphertext &encrypted, uint64_t max_multiplication) const;
-
+        void transform_to_positive_ntt_inplace(Ciphertext &encrypted) const;
+        Ciphertext transform_to_positive_ntt(const Ciphertext &encrypted) const
+        {
+            Ciphertext cpy = encrypted;
+            transform_to_positive_ntt_inplace(cpy);
+            return cpy;
+        }
         /**
          * Transform to NTT, but instead of using negacyclic-ntt, uses conventional NTT, with padding.
          */
-        Plaintext transform_to_positive_ntt(const Plaintext &plain, const parms_id_type &parms_id)
+        Plaintext transform_to_positive_ntt(const Plaintext &plain) const
         {
             Plaintext cpy = plain;
-            transform_to_positive_ntt_inplace(cpy, parms_id);
-            return plain;
+            transform_to_positive_ntt_inplace(cpy);
+            return cpy;
         }
 
         /**
