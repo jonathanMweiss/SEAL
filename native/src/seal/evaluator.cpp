@@ -2953,9 +2953,8 @@ namespace seal
                 std::uint64_t *s_ptr = std::get<0>(I).ptr();
                 std::uint64_t *d_ptr = std::get<1>(I).ptr();
 
-                // TODO: using memcpy causes a bug. maybe ask yossi.
-                //            memcpy(d_ptr, s_ptr, coeff_count);
-                //            memset(s_ptr, 0, coeff_count);
+                //                memcpy(d_ptr, s_ptr, coeff_count);
+                //                memset(s_ptr, 0, coeff_count);
                 for (std::uint64_t i = 0; i < coeff_count; ++i)
                 {
                     *d_ptr = *s_ptr;
@@ -2963,6 +2962,9 @@ namespace seal
                     ++d_ptr;
                     ++s_ptr;
                 }
+                // TODO: using memcpy causes a bug. maybe ask yossi.
+                //            memcpy(d_ptr, s_ptr, coeff_count);
+                //            memset(s_ptr, 0, coeff_count);
             });
     }
 
@@ -3027,5 +3029,131 @@ namespace seal
             pad_polynomial(
                 s_ptr, d_ptr, first_ctx.parms().poly_modulus_degree(), coeff_modulus_size, padded_coeff_count);
         });
+    }
+
+    //    vector<uint64_t> fillVectorFromPointers(std::uint64_t *start, std::uint64_t *end)
+    //    {
+    //        std::vector<std::uint64_t> vec;
+    //        vec.clear(); // Clear the vector before filling it
+    //        while (start != end)
+    //        {
+    //            vec.push_back(*start);
+    //            ++start;
+    //        }
+    //        return vec;
+    //    }
+
+    /**
+     *
+     * @param poly_begin
+     * @param poly_end
+     * @param poly_degree the actual expected degree of the polynomial, for instance it should be mod X^8192+1, than
+     * the poly_degree should be 8192.
+     * @param mod
+     */
+    void apply_mod(
+        std::uint64_t *poly_begin, std::uint64_t *poly_end, std::uint64_t poly_degree, const seal::Modulus &mod)
+    {
+        std::uint64_t *poly_runner = poly_end - poly_degree;
+        std::uint64_t *zero_to_here = poly_end;
+        while (poly_runner >= poly_begin) // including the last position
+        {
+            *poly_runner = seal::util::sub_uint_mod(*poly_runner, *poly_end, mod);
+            poly_runner--;
+            //            *poly_end = 0;
+            poly_end--;
+        }
+
+        //        std::uint64_t *modded_poly_end = poly_begin + poly_degree;
+        //        while (modded_poly_end != zero_to_here)
+        //        {
+        //            *modded_poly_end = 0;
+        //            modded_poly_end++;
+        //        }
+    }
+
+    void Evaluator::polynomial_mod(Ciphertext &encrypted) const
+    {
+        if (encrypted.parms_id() != context_.positive_wrapped_parms_id())
+        {
+            throw invalid_argument("not supporting multiple parms_id for postivie_wrapped convolution.");
+        }
+
+        auto &context_data = *context_.get_context_data(encrypted.parms_id());
+        auto &parms = context_data.parms();
+        auto &coeff_modulus = parms.coeff_modulus();
+        size_t padded_coeff_count = parms.poly_modulus_degree();
+
+        auto &frst_params = context_.first_context_data()->parms();
+
+        SEAL_ITERATE(seal::util::PolyIter(encrypted), encrypted.size(), [&](seal::util::RNSIter I) {
+            size_t mod_index = 0;
+            SEAL_ITERATE(I, coeff_modulus.size(), [&](auto J) {
+                auto modulus = coeff_modulus[mod_index++];
+
+                // J = begin, J+ padded_coeff_count = end.
+                apply_mod(J, J + (padded_coeff_count), frst_params.poly_modulus_degree(), modulus);
+            });
+        });
+
+        // now neew to do the oposite of the zero pad:
+        // start from the beginning, and copy each poly_mod_degree to the correct location.
+
+        // now dePAD the polynomial
+        //        seal::util::PolyIter pad_itr(encrypted.data(), padded_coeff_count, coeff_modulus.size());
+        //        seal::util::PolyIter reg_itr(encrypted.data(), frst_params.poly_modulus_degree(),
+        //        coeff_modulus.size());
+    }
+    void Evaluator::polynomial_mod(Plaintext &ptx) const
+    {
+        //        if (ptx.parms_id() != context_.positive_wrapped_parms_id())
+        //        {
+        //            throw invalid_argument("not supporting multiple parms_id for postivie_wrapped convolution.");
+        //        }
+        if (ptx.is_ntt_form())
+        {
+            throw invalid_argument("can't apply poly mod to plaintext in NTT form");
+        }
+
+        // assuming polynomial is in padded form.
+
+        auto &context_data = *context_.get_context_data(context_.positive_wrapped_parms_id());
+        auto &parms = context_data.parms();
+        auto &coeff_modulus = parms.coeff_modulus();
+        size_t padded_coeff_count = parms.poly_modulus_degree();
+
+        auto &frst_params = context_.first_context_data()->parms();
+        auto reg_coeff_count = frst_params.poly_modulus_degree();
+
+        size_t mod_index = 0;
+        SEAL_ITERATE(RNSIter(ptx.data(), padded_coeff_count), coeff_modulus.size(), [&](auto J) {
+            auto modulus = coeff_modulus[mod_index++];
+
+            // J = begin, J+ padded_coeff_count = end.
+            apply_mod(J, J + (padded_coeff_count), reg_coeff_count, modulus);
+        });
+        // now dePAD the polynomial
+
+        seal::util::RNSIter reg_itr(ptx.data(), frst_params.poly_modulus_degree());
+        seal::util::RNSIter pad_itr(ptx.data(), padded_coeff_count);
+
+        std::advance(reg_itr, 1);
+        std::advance(pad_itr, 1);
+        // no need to move the first polynomial since it sits in its correct place.
+        SEAL_ITERATE(seal::util::iter(reg_itr, pad_itr), coeff_modulus.size() - 1, [&](auto I) {
+            std::uint64_t *s_ptr(std::get<1>(I));
+            std::uint64_t *d_ptr(std::get<0>(I));
+
+            // cpy the polynomial to the new location.
+            for (std::uint64_t i = 0; i < reg_coeff_count; ++i)
+            {
+                *d_ptr = *s_ptr;
+                ++d_ptr;
+                ++s_ptr;
+            }
+        });
+
+        ptx.resize(reg_coeff_count * coeff_modulus.size());
+        ptx.parms_id() = context_.first_parms_id();
     }
 } // namespace seal

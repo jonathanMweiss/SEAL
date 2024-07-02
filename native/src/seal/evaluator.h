@@ -81,6 +81,14 @@ namespace seal
         void zero_pad(Ciphertext &encrypted) const;
 
         /**
+         * Takes a ciphertext, and applies X^n+1 modulus on the inner structure of the the ctx.
+         * It performs the operation inplace and then release unneeded emory back to the pool.
+         * @param encrypted
+         */
+        void polynomial_mod(Ciphertext &encrypted) const;
+        void polynomial_mod(Plaintext &encrypted) const;
+
+        /**
          * Transform to NTT, but instead of using negacyclic-ntt, uses conventional NTT, with padding.
          * Modifies the given plaintext, and attempts to reallocate its data. if possible avoids copying.
          */

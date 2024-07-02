@@ -139,8 +139,7 @@ namespace sealtest
         std::uint64_t poly_number = 0;
         SEAL_ITERATE(seal::util::ConstPolyIter(ctx), ctx.size(), [&](seal::util::ConstRNSIter rns_iter_per_poly) {
             std::uint64_t rns_number = 0;
-            ss << "\""
-               << "poly" << poly_number++ << "\":{";
+            ss << "\"" << "poly" << poly_number++ << "\":{";
             SEAL_ITERATE(seal::util::iter(rns_iter_per_poly), modulus.size(), [&](auto coef_iter) {
                 ss << "\"" << modulus[rns_number++].value() << "\":[";
                 if (poly_number == 3)
@@ -222,15 +221,20 @@ namespace sealtest
         return (ev_res == ev_mul);
     }
 
-    std::vector<std::uint64_t> plain_to_vector(const Plaintext &ptx)
+    std::vector<std::uint64_t> dynarray_to_vector(const seal::DynArray<std::uint64_t> &dyn)
     {
         std::vector<std::uint64_t> v;
-        v.reserve(ptx.dyn_array().size()); // x4 is for ntt pad. x2 is for modulus size
-        for (std::uint64_t i = 0; i < ptx.dyn_array().size(); ++i)
+        v.reserve(dyn.size()); // x4 is for ntt pad. x2 is for modulus size
+        for (std::uint64_t i = 0; i < dyn.size(); ++i)
         {
-            v.emplace_back(ptx.dyn_array().at(i));
+            v.emplace_back(dyn.at(i));
         }
         return v;
+    }
+
+    std::vector<std::uint64_t> plain_to_vector(const Plaintext &ptx)
+    {
+        return dynarray_to_vector(ptx.dyn_array());
     }
 
     shared_ptr<UniformRandomGenerator> prng()

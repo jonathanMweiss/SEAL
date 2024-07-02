@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <ctime>
 #include <string>
+#include <unordered_set>
 #include "gtest/gtest.h"
 #include "helpers.h"
 
@@ -50,7 +51,7 @@ namespace sealtest
             i1++;
         }
     }
-    TEST(EvaluatorTest, PostiveWrappedNTTPlaintextPadding)
+    SEALContext make_128deg_context()
     {
         std::uint64_t N = 128;
         // The common parameters: the plaintext and the polynomial moduli
@@ -62,10 +63,16 @@ namespace sealtest
         parms.set_plain_modulus(plain_modulus);
         parms.set_coeff_modulus(CoeffModulus::Create(N, { 30, 30, 30, 30 }));
 
-        SEALContext context(parms, false, sec_level_type::none, 2);
+        return { parms, false, sec_level_type::none, 2 };
+    }
+
+    TEST(EvaluatorTest, PostiveWrappedNTTPlaintextPadding)
+    {
+        std::uint64_t N = 128;
+        auto context = make_128deg_context();
         Evaluator evaluator(context);
 
-        Plaintext ptx = random_plain(parms);
+        Plaintext ptx = random_plain(context.first_context_data()->parms());
         evaluator.plain_to_coeff_space(ptx, context.first_parms_id());
         Plaintext cpy = ptx;
 
@@ -90,16 +97,9 @@ namespace sealtest
     TEST(EvaluatorTest, PostiveWrappedNTTCiphertextPadding)
     {
         std::uint64_t N = 128;
-        // The common parameters: the plaintext and the polynomial moduli
-        Modulus plain_modulus(65);
+        auto context = make_128deg_context();
+        auto parms = context.first_context_data()->parms();
 
-        // The parameters and the context of the higher level
-        EncryptionParameters parms(scheme_type::bgv);
-        parms.set_poly_modulus_degree(128);
-        parms.set_plain_modulus(plain_modulus);
-        parms.set_coeff_modulus(CoeffModulus::Create(N, { 30, 30, 30, 30 }));
-
-        SEALContext context(parms, false, sec_level_type::none, 1);
         Evaluator evaluator(context);
 
         Plaintext ptx = random_plain(parms);
@@ -110,7 +110,6 @@ namespace sealtest
         keygen.create_public_key(pk);
         Encryptor encryptor(context, pk);
         Decryptor decryptor(context, keygen.secret_key());
-        auto parms_id = context.first_parms_id();
 
         auto plain = random_plain(parms);
 
@@ -199,4 +198,44 @@ namespace sealtest
             });
     }
 
+    TEST(EvaluatorTest, tmp)
+    {
+        std::uint64_t max_poly_size = 128 * 2;
+        auto context = make_128deg_context();
+        auto parms = context.first_context_data()->parms();
+        Evaluator evaluator(context);
+
+        Plaintext ptx("0");
+        evaluator.plain_to_coeff_space(ptx, context.first_parms_id());
+        evaluator.zero_pad(ptx, context.first_parms_id());
+
+        for (std::uint64_t i = 0; i < ptx.dyn_array().size(); ++i)
+        {
+            ptx[i] = i % 512;
+        }
+
+        // done setup, now we will test the function.
+        evaluator.polynomial_mod(ptx);
+
+        //  result needs to be divided into three parts. each part should be of 128 elements, and have the same number
+        // throughout. all 3 parts should have different values.
+        auto result = plain_to_vector(ptx);
+
+        for (std::uint64_t i = 0; i < 3; ++i)
+        {
+            for (auto j = i * 128; j < i * 128 + 128; ++j)
+            {
+                ASSERT_EQ(result[i * 128], result[j]);
+            }
+        }
+
+        std::unordered_set<std::uint64_t> difference_test;
+        for (std::uint64_t i = 0; i < 3; ++i)
+        {
+            auto j = i * 128;
+            difference_test.insert(result[j]);
+        }
+        ASSERT_EQ(difference_test.size(), 3);
+        ASSERT_EQ(result.size(), 128 * 3);
+    }
 } // namespace sealtest
