@@ -26,7 +26,7 @@ namespace sealtest
      * @param N the poly_degree of non padded polynomials.
      * @param expansion_ratio
      */
-    void validate_rns_poly_adding(
+    void validate_rns_poly_padding(
         seal::util::PtrIter<std::uint64_t *> padded, seal::util::PtrIter<std::uint64_t *> regular, std::uint64_t N,
         std::uint64_t expansion_ratio = 4)
     {
@@ -51,7 +51,7 @@ namespace sealtest
             i1++;
         }
     }
-    SEALContext make_128deg_context()
+    SEALContext make_128deg_context(int nummults = 2)
     {
         std::uint64_t N = 128;
         // The common parameters: the plaintext and the polynomial moduli
@@ -63,7 +63,7 @@ namespace sealtest
         parms.set_plain_modulus(plain_modulus);
         parms.set_coeff_modulus(CoeffModulus::Create(N, { 30, 30, 30, 30 }));
 
-        return { parms, false, sec_level_type::none, 2 };
+        return { parms, false, sec_level_type::none, nummults };
     }
 
     TEST(EvaluatorTest, PostiveWrappedNTTPlaintextPadding)
@@ -79,10 +79,9 @@ namespace sealtest
         evaluator.zero_pad(ptx, context.first_parms_id());
 
         std::uint64_t padding_expansation_ration = 4;
-        // assert correct padding.
-        ASSERT_EQ(
-            ptx.dyn_array().size(),
-            padding_expansation_ration * 3 * N); // 4x is from the padding, 3x is from the number of moduli.
+
+        // 4x is from the padding, 3x is from the number of moduli.
+        ASSERT_EQ(ptx.dyn_array().size(), padding_expansation_ration * 3 * N);
         ASSERT_TRUE(ptx.coeff_count() != cpy.coeff_count());
 
         seal::util::RNSIter ptx_itr(ptx.data(), N * 4);
@@ -90,7 +89,7 @@ namespace sealtest
         SEAL_ITERATE(
             seal::util::iter(ptx_itr, cpy_itr), context.first_context_data()->parms().coeff_modulus().size(),
             [&](tuple<seal::util::PtrIter<std::uint64_t *>, seal::util::PtrIter<std::uint64_t *>> I) {
-                validate_rns_poly_adding(std::get<0>(I), std::get<1>(I), N, padding_expansation_ration);
+                validate_rns_poly_padding(std::get<0>(I), std::get<1>(I), N, padding_expansation_ration);
             });
     }
 
@@ -132,12 +131,77 @@ namespace sealtest
             [&](tuple<seal::util::RNSIter, seal::util::RNSIter> I) {
                 SEAL_ITERATE(seal::util::iter(std::get<0>(I), std::get<1>(I)), cpy.coeff_modulus_size(), [&](auto J) {
                     // now check they are equal for the frst N elements., and the rest are zeros.
-                    validate_rns_poly_adding(std::get<0>(J), std::get<1>(J), N, 2);
+                    validate_rns_poly_padding(std::get<0>(J), std::get<1>(J), N, 2);
                 });
             });
     }
 
-    TEST(EvaluatorTest, multiplicationWithPositiveNtt)
+    TEST(EvaluatorTest, PositiveNttConstantMonomyialMultCTx)
+    {
+        std::uint64_t N = 8192;
+        seal::EncryptionParameters parms(seal::scheme_type::bgv);
+
+        parms.set_poly_modulus_degree(N);
+        //            enc.set_coeff_modulus(seal::CoeffModulus::BFVDefault(N, sec_level_type::tc192));
+
+        auto tmp = std::vector<int>{ 54, 41, 42 };
+        auto o = seal::CoeffModulus::Create(N, tmp);
+        parms.set_coeff_modulus(o);
+        parms.set_plain_modulus(seal::PlainModulus::Batching(N, 16 + 1));
+
+        SEALContext context(parms, false, sec_level_type::none, 1);
+        Evaluator evaluator(context);
+
+        Plaintext ptx("2"); //(parms);
+
+        // creating encryption:
+        KeyGenerator keygen(context);
+        SecretKey secret_key = keygen.secret_key();
+        PublicKey pk;
+        keygen.create_public_key(pk);
+        Encryptor encryptor(context, pk);
+        Decryptor decryptor(context, keygen.secret_key());
+
+        Ciphertext ctx(context);
+        encryptor.encrypt(ptx, ctx);
+        evaluator.transform_from_ntt_inplace(ctx);
+
+        // multiplying them:
+        ptx = evaluator.transform_to_positive_ntt(ptx);
+        ctx = evaluator.transform_to_positive_ntt(ctx);
+
+        seal::Ciphertext dst;
+        evaluator.multiply_plain(ctx, ptx, dst);
+
+        // Testsing for correct values after multiplying. (ptx after ntt = [2,2,2,2,2.....,2]
+        auto positive_wrapped_params = context.get_context_data(context.positive_wrapped_parms_id())->parms();
+        // Create poly_iter
+        seal::util::PolyIter s_itr(ctx);
+        seal::util::PolyIter d_itr(dst);
+        SEAL_ITERATE(
+            seal::util::iter(s_itr, d_itr), ctx.size(), [&](tuple<seal::util::RNSIter, seal::util::RNSIter> I) {
+                std::uint64_t mod_index = 0;
+                SEAL_ITERATE(
+                    seal::util::iter(std::get<0>(I), std::get<1>(I)), positive_wrapped_params.coeff_modulus().size(),
+                    [&](auto coefItersJ) {
+                        auto mod = parms.coeff_modulus().at(mod_index++);
+                        auto s(std::get<0>(coefItersJ));
+                        auto double_s(std::get<1>(coefItersJ));
+
+                        for (std::uint64_t i = 0; i < positive_wrapped_params.poly_modulus_degree(); ++i)
+                        {
+                            auto expected_value = seal::util::multiply_uint_mod(*s, 2, mod);
+                            ASSERT_EQ(expected_value, *double_s);
+                        }
+                    });
+            });
+    }
+    TEST(EvaluatorTest, PositiveINTTCTX)
+    {
+        GTEST_FAIL();
+    }
+
+    TEST(EvaluatorTest, postivie_ntt_constant_mult)
     {
         std::uint64_t N = 8192;
         seal::EncryptionParameters parms(seal::scheme_type::bgv);
@@ -198,7 +262,7 @@ namespace sealtest
             });
     }
 
-    TEST(EvaluatorTest, ptx_modulus)
+    TEST(EvaluatorTest, polynomialMod1)
     {
         std::uint64_t max_poly_size = 128 * 2;
         auto context = make_128deg_context();
@@ -237,5 +301,80 @@ namespace sealtest
         }
         ASSERT_EQ(difference_test.size(), 3);
         ASSERT_EQ(result.size(), 128 * 3);
+    }
+
+    TEST(EvaluatorTest, polynomialMod2)
+    {
+        std::uint64_t max_poly_size = 128 * 2;
+        auto context = make_128deg_context(1);
+        auto parms = context.first_context_data()->parms();
+        Evaluator evaluator(context);
+
+        Plaintext ptx("0");
+        evaluator.plain_to_coeff_space(ptx, context.first_parms_id());
+        evaluator.zero_pad(ptx, context.first_parms_id());
+
+        for (std::uint64_t i = 0; i < ptx.dyn_array().size(); ++i)
+        {
+            if (i % 128 != i % 256)
+            {
+                ptx[i] = 0;
+                continue;
+            }
+            ptx[i] = i % 128;
+        }
+
+        auto vc = plain_to_vector(ptx);
+        // done setup, now we will test the function.
+        evaluator.polynomial_mod(ptx);
+
+        //  result needs to be divided into three parts. each part should be of 128 elements, and have the same number
+        // throughout. all 3 parts should have different values.
+        auto result = plain_to_vector(ptx);
+        uint64_t j = 0;
+        for (int i = 0; i < 3; ++i)
+        {
+            for (int k = 0; k < 128; ++k)
+            {
+                ASSERT_EQ(result[j], j % 128);
+                j++;
+            }
+        }
+    }
+
+    TEST(EvaluatorTest, ctxMod)
+    {
+        // shallow test, just ensuring the structure of the ctx remains correct.
+        // polynomial mod is checked in polynomialMod
+        std::uint64_t max_poly_size = 128 * 2;
+        auto context = make_128deg_context(1);
+        auto parms = context.first_context_data()->parms();
+
+        Evaluator evaluator(context);
+        KeyGenerator keygen(context);
+        SecretKey secret_key = keygen.secret_key();
+        PublicKey pk;
+        keygen.create_public_key(pk);
+
+        Encryptor encryptor(context, pk);
+        Decryptor decryptor(context, keygen.secret_key());
+
+        auto plain = random_plain(parms);
+
+        Ciphertext encrypted(context);
+        encryptor.encrypt(plain, encrypted);
+        evaluator.transform_from_ntt_inplace(encrypted);
+
+        auto non_padded = encrypted;
+        evaluator.zero_pad(encrypted);
+        evaluator.polynomial_mod(encrypted);
+
+        auto modded_vc = dynarray_to_vector(encrypted.dyn_array());
+        auto non_padded_vc = dynarray_to_vector(non_padded.dyn_array());
+        ASSERT_EQ(modded_vc.size(), non_padded_vc.size());
+        for (std::uint64_t i = 0; i < modded_vc.size(); ++i)
+        {
+            ASSERT_EQ(modded_vc[i], non_padded_vc[i]);
+        }
     }
 } // namespace sealtest
