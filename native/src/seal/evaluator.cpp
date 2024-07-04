@@ -3085,14 +3085,12 @@ namespace seal
         size_t padded_coeff_count = parms.poly_modulus_degree();
 
         auto &frst_params = context_.first_context_data()->parms();
+        size_t reg_coeff_count = frst_params.poly_modulus_degree();
 
         SEAL_ITERATE(seal::util::PolyIter(encrypted), encrypted.size(), [&](seal::util::RNSIter I) {
             size_t mod_index = 0;
             SEAL_ITERATE(I, coeff_modulus.size(), [&](auto J) {
-                auto modulus = coeff_modulus[mod_index++];
-
-                // J = begin, J+ padded_coeff_count = end.
-                apply_mod(J, J + (padded_coeff_count), frst_params.poly_modulus_degree(), modulus);
+                apply_mod(J, J + (padded_coeff_count), reg_coeff_count, coeff_modulus[mod_index++]);
             });
         });
 
@@ -3104,43 +3102,17 @@ namespace seal
         //        seal::util::PolyIter reg_itr(encrypted.data(), frst_params.poly_modulus_degree(),
         //        coeff_modulus.size());
     }
-    void Evaluator::polynomial_mod(Plaintext &ptx) const
+
+    // helper function to polynomial mod.
+    void depad_rns_polynomial(
+        seal::util::RNSIter reg_itr, seal::util::RNSIter pad_itr, std::uint64_t reg_coeff_count,
+        std::uint64_t coeff_modulus_size)
     {
-        //        if (ptx.parms_id() != context_.positive_wrapped_parms_id())
-        //        {
-        //            throw invalid_argument("not supporting multiple parms_id for postivie_wrapped convolution.");
-        //        }
-        if (ptx.is_ntt_form())
-        {
-            throw invalid_argument("can't apply poly mod to plaintext in NTT form");
-        }
-
-        // assuming polynomial is in padded form.
-
-        auto &context_data = *context_.get_context_data(context_.positive_wrapped_parms_id());
-        auto &parms = context_data.parms();
-        auto &coeff_modulus = parms.coeff_modulus();
-        size_t padded_coeff_count = parms.poly_modulus_degree();
-
-        auto &frst_params = context_.first_context_data()->parms();
-        auto reg_coeff_count = frst_params.poly_modulus_degree();
-
-        size_t mod_index = 0;
-        SEAL_ITERATE(RNSIter(ptx.data(), padded_coeff_count), coeff_modulus.size(), [&](auto J) {
-            auto modulus = coeff_modulus[mod_index++];
-
-            // J = begin, J+ padded_coeff_count = end.
-            apply_mod(J, J + (padded_coeff_count), reg_coeff_count, modulus);
-        });
-        // now dePAD the polynomial
-
-        seal::util::RNSIter reg_itr(ptx.data(), frst_params.poly_modulus_degree());
-        seal::util::RNSIter pad_itr(ptx.data(), padded_coeff_count);
-
+        // no need to move the first polynomial
         std::advance(reg_itr, 1);
         std::advance(pad_itr, 1);
         // no need to move the first polynomial since it sits in its correct place.
-        SEAL_ITERATE(seal::util::iter(reg_itr, pad_itr), coeff_modulus.size() - 1, [&](auto I) {
+        SEAL_ITERATE(seal::util::iter(reg_itr, pad_itr), coeff_modulus_size - 1, [&](auto I) {
             std::uint64_t *s_ptr(std::get<1>(I));
             std::uint64_t *d_ptr(std::get<0>(I));
 
@@ -3152,6 +3124,33 @@ namespace seal
                 ++s_ptr;
             }
         });
+    }
+
+    // assuming polynomial is in padded form.
+    void Evaluator::polynomial_mod(Plaintext &ptx) const
+    {
+        if (ptx.is_ntt_form())
+        {
+            throw invalid_argument("can't apply poly mod to plaintext in NTT form");
+        }
+
+        auto &context_data = *context_.get_context_data(context_.positive_wrapped_parms_id());
+        auto &parms = context_data.parms();
+        auto &coeff_modulus = parms.coeff_modulus();
+        size_t padded_coeff_count = parms.poly_modulus_degree();
+
+        auto &frst_params = context_.first_context_data()->parms();
+        auto reg_coeff_count = frst_params.poly_modulus_degree();
+
+        size_t mod_index = 0;
+        SEAL_ITERATE(RNSIter(ptx.data(), padded_coeff_count), coeff_modulus.size(), [&](auto J) {
+            // J = begin, J+ padded_coeff_count = end.
+            apply_mod(J, J + (padded_coeff_count), reg_coeff_count, coeff_modulus[mod_index++]);
+        });
+
+        depad_rns_polynomial(
+            seal::util::RNSIter(ptx.data(), frst_params.poly_modulus_degree()),
+            seal::util::RNSIter(ptx.data(), padded_coeff_count), reg_coeff_count, coeff_modulus.size());
 
         ptx.resize(reg_coeff_count * coeff_modulus.size());
         ptx.parms_id() = context_.first_parms_id();

@@ -198,7 +198,7 @@ namespace sealtest
             });
     }
 
-    TEST(EvaluatorTest, tmp)
+    TEST(EvaluatorTest, ptx_modulus)
     {
         std::uint64_t max_poly_size = 128 * 2;
         auto context = make_128deg_context();
