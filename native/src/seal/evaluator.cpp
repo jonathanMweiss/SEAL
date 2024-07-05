@@ -3055,25 +3055,14 @@ namespace seal
     void apply_mod(
         std::uint64_t *poly_begin, std::uint64_t *poly_end, std::uint64_t poly_degree, const seal::Modulus &mod)
     {
-        auto v1 = fillVectorFromPointers(poly_begin, poly_end);
         std::uint64_t *poly_runner = poly_end - poly_degree;
-        std::uint64_t *zero_to_here = poly_end;
-        // this shouldn't change if polynomial is already modded.
-        while (poly_runner >= poly_begin) // including the last position
+        while (poly_runner >= poly_begin) // including the first coefficient
         {
             *poly_runner = seal::util::sub_uint_mod(*poly_runner, *poly_end, mod);
             poly_runner--;
             //            *poly_end = 0;
             poly_end--;
         }
-        auto v2 = fillVectorFromPointers(poly_begin, zero_to_here);
-        std::cout << "bug";
-        //        std::uint64_t *modded_poly_end = poly_begin + poly_degree;
-        //        while (modded_poly_end != zero_to_here)
-        //        {
-        //            *modded_poly_end = 0;
-        //            modded_poly_end++;
-        //        }
     }
 
     // assuming polynomial is in padded form.
