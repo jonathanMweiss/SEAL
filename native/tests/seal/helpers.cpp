@@ -263,4 +263,82 @@ namespace sealtest
         }
         return p;
     }
+
+    std::uint64_t vector_gcd(std::vector<std::uint64_t> v)
+    {
+        std::uint64_t _gcd = std::gcd(v[0], v[1]);
+        for (std::uint64_t i = 2; i < v.size(); ++i)
+        {
+            _gcd = gcd(_gcd, v[i]);
+        }
+
+        return _gcd;
+    }
+
+    bool has_proper_roots(uint64_t wanted_ntt_deg, const vector<Modulus> &o)
+    {
+        vector<uint64_t> tmp;
+        // NTT L(n).
+        for (uint64_t l = 0; l < o.size(); ++l)
+        {
+            tmp.push_back((o[l].value() - 1));
+        }
+
+        // to get NTT to work (need to have roots of unity) we need the following to be true:
+        return 0 == (vector_gcd(tmp) % wanted_ntt_deg);
+    }
+
+    bool is_valid_ntt_params_for_deg(int i, int j, int k, std::uint64_t N, std::uint64_t wanted_ntt_deg)
+    {
+        if (i + j + k < 152)
+        {
+            return false;
+        }
+        auto o = seal::CoeffModulus::Create(N, std::vector<int>{ i, j, k });
+        return has_proper_roots(wanted_ntt_deg, o);
+    }
+
+    //        the following works i: 41 j: 57 k: 57
+    //        the following works i: 51 j: 57 k: 57
+    //        the following works i: 57 j: 41 k: 57
+    //        the following works i: 57 j: 51 k: 57
+    //        the following works i: 57 j: 57 k: 41
+    //        the following works i: 57 j: 57 k: 51
+    void find_possible_parameters()
+    {
+        std::uint64_t N = 8192;
+        seal::EncryptionParameters parms(seal::scheme_type::bgv);
+        parms.set_poly_modulus_degree(N);
+
+        parms.set_plain_modulus(seal::PlainModulus::Batching(N, 16 + 1));
+
+        for (int i = 41; i < 60; ++i)
+        {
+            for (int j = 41; j < 60; j++)
+            {
+                for (int k = 41; k < 60; k++)
+                {
+                    if (!is_valid_ntt_params_for_deg(i, j, k, N, 1 << 16))
+                    {
+                        continue;
+                    };
+                    std::cout << "the following works i: " << i << " j: " << j << " k: " << k << std::endl;
+                    auto tmp = std::vector<int>{ i, j, k };
+                    auto o = seal::CoeffModulus::Create(N, tmp);
+
+                    parms.set_coeff_modulus(o);
+                    auto cntx = SEALContext(parms, false, sec_level_type::tc192, 2);
+                    ASSERT_TRUE(
+                        cntx.get_context_data(cntx.positive_wrapped_parms_id())->qualifiers().parameter_error ==
+                        EncryptionParameterQualifiers::error_type::success);
+                    ASSERT_TRUE(
+                        cntx.first_context_data()->qualifiers().parameter_error ==
+                        EncryptionParameterQualifiers::error_type::success);
+
+                    //                    std::cout << cntx.first_context_data()->parms().coeff_modulus().size() <<
+                    //                    std::endl;
+                }
+            }
+        }
+    }
 } // namespace sealtest

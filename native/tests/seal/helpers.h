@@ -27,7 +27,7 @@ namespace sealtest
     shared_ptr<UniformRandomGenerator> prng();
 
     seal::Plaintext random_plain(const seal::EncryptionParameters &enc_params);
-
+    void find_possible_parameters();
     struct SetupObjs
     {
         seal::EncryptionParameters enc_params;
@@ -49,9 +49,10 @@ namespace sealtest
             seal::EncryptionParameters enc(seal::scheme_type::bgv);
 
             enc.set_poly_modulus_degree(N);
-            //            enc.set_coeff_modulus(seal::CoeffModulus::BFVDefault(N, sec_level_type::tc192));
+            enc.set_coeff_modulus(seal::CoeffModulus::BFVDefault(N, sec_level_type::tc192));
 
-            auto tmp = std::vector<int>{ 54, 41, 42 };
+//            auto tmp = std::vector<int>{ 54, 41, 42 };
+            auto tmp = std::vector<int>{ 51, 57, 57 };
             auto o = seal::CoeffModulus::Create(N, tmp);
             enc.set_coeff_modulus(o);
             enc.set_plain_modulus(seal::PlainModulus::Batching(N, logt + 1));
