@@ -2998,12 +2998,17 @@ namespace seal
         {
             throw invalid_argument("not supporting multiple parms_id for postivie_wrapped convolution.");
         }
+        if (encrypted.is_ntt_form())
+        {
+            throw invalid_argument("can't pad ciphertex in ntt form.");
+        }
         auto &first_ctx = *context_.get_context_data(context_.first_parms_id());
 
         auto postive_wrapped_parms_id = context_.positive_wrapped_parms_id();
 
         // allocates at the end of the encrypted enough space to hold all the polynomials.
-        encrypted.resize(context_, postive_wrapped_parms_id, encrypted.size());
+        seal::Ciphertext cpy;
+        cpy.resize(context_, postive_wrapped_parms_id, encrypted.size());
 
         auto &ctx_data = *context_.get_context_data(postive_wrapped_parms_id);
         auto &parms = ctx_data.parms();
@@ -3012,23 +3017,24 @@ namespace seal
         size_t coeff_modulus_size = coeff_modulus.size();
 
         // iterators to iterate in reverse.
-        auto reg_itr = reverse_from_pos(
-            seal::util::PolyIter(encrypted.data(), first_ctx.parms().poly_modulus_degree(), coeff_modulus_size),
-            encrypted.size());
-        auto padded_itr = reverse_from_pos(
-            seal::util::PolyIter(encrypted.data(), padded_coeff_count, coeff_modulus_size), encrypted.size());
+        auto reg_itr = seal::util::ConstPolyIter(encrypted);
+        auto padded_itr = seal::util::PolyIter(cpy);
 
         seal::util::RNSIter pp(encrypted.data(), padded_coeff_count);
-        SEAL_ITERATE(seal::util::iter(reg_itr, padded_itr), coeff_modulus_size, [&](tuple<RNSIter, RNSIter> I) {
+        SEAL_ITERATE(seal::util::iter(reg_itr, padded_itr), encrypted.size(), [&](tuple<ConstRNSIter, RNSIter> I) {
             // now need to write a single polynomial to the new padded location.
-
-            std::uint64_t *s_ptr = *std::get<0>(I);
-            std::uint64_t *d_ptr = *std::get<1>(I);
-
-            // copy the polynomial to the new location.
-            pad_polynomial(
-                s_ptr, d_ptr, first_ctx.parms().poly_modulus_degree(), coeff_modulus_size, padded_coeff_count);
+            SEAL_ITERATE(seal::util::iter(std::get<0>(I), std::get<1>(I)), coeff_modulus_size, [&](auto coefItrs) {
+                const std::uint64_t *s_ptr(std::get<0>(coefItrs));
+                std::uint64_t *d_ptr(std::get<1>(coefItrs));
+                for (std::uint64_t i = 0; i < first_ctx.parms().poly_modulus_degree(); i++)
+                {
+                    *d_ptr = *s_ptr;
+                    ++d_ptr;
+                    ++s_ptr;
+                }
+            });
         });
+        encrypted = std::move(cpy);
     }
 
     vector<uint64_t> fillVectorFromPointers(std::uint64_t *start, std::uint64_t *end)
@@ -3112,6 +3118,11 @@ namespace seal
 
     void Evaluator::polynomial_mod(Ciphertext &encrypted) const
     {
+        if (encrypted.is_ntt_form())
+        {
+            throw invalid_argument("can't apply poly mod to ciphertext in NTT form");
+        }
+
         if (encrypted.parms_id() != context_.positive_wrapped_parms_id())
         {
             throw invalid_argument("not supporting multiple parms_id for postivie_wrapped convolution.");
@@ -3158,5 +3169,43 @@ namespace seal
 
         encrypted.resize(context_, context_.first_parms_id(), encrypted.size());
         encrypted.parms_id() = context_.first_parms_id();
+    }
+    void Evaluator::transform_from_positive_ntt_inplace(Ciphertext &encrypted_ntt) const
+    {
+        if (!is_metadata_valid_for(encrypted_ntt, context_) || !is_buffer_valid(encrypted_ntt))
+        {
+            throw invalid_argument("encrypted is not valid for encryption parameters");
+        }
+        if (encrypted_ntt.parms_id() != context_.positive_wrapped_parms_id())
+        {
+            throw invalid_argument("encrypted_ntt is not in positive NTT form");
+        }
+
+        auto context_data_ptr = context_.get_context_data(encrypted_ntt.parms_id());
+        if (!context_data_ptr)
+        {
+            throw invalid_argument("encrypted_ntt is not valid for encryption parameters");
+        }
+
+        // Extract encryption parameters.
+        auto &context_data = *context_data_ptr;
+        auto &parms = context_data.parms();
+        size_t coeff_count = parms.poly_modulus_degree();
+        size_t coeff_modulus_size = parms.coeff_modulus().size();
+        size_t encrypted_ntt_size = encrypted_ntt.size();
+
+        auto ntt_tables = iter(context_data.small_ntt_tables());
+
+        // Size check
+        if (!product_fits_in(coeff_count, coeff_modulus_size))
+        {
+            throw logic_error("invalid parameters");
+        }
+
+        // Transform each polynomial from NTT domain
+        inverse_ntt_negacyclic_harvey(encrypted_ntt, encrypted_ntt_size, ntt_tables);
+
+        // Finally change the is_ntt_transformed flag
+        encrypted_ntt.is_ntt_form() = false;
     }
 } // namespace seal

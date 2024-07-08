@@ -51,6 +51,32 @@ namespace sealtest
             i1++;
         }
     }
+
+    void assert_eq_ciphers(const Ciphertext &e1, const Ciphertext &e2)
+    {
+        auto modded_vc = dynarray_to_vector(e1.dyn_array());
+        auto non_padded_vc = dynarray_to_vector(e2.dyn_array());
+        ASSERT_EQ(modded_vc.size(), non_padded_vc.size());
+        for (std::uint64_t i = 0; i < modded_vc.size(); ++i)
+        {
+            ASSERT_EQ(modded_vc[i], non_padded_vc[i]);
+        }
+    }
+
+    SEALContext make_context(int poly_deg, int nummults)
+    {
+        std::uint64_t N = poly_deg;
+        seal::EncryptionParameters parms(seal::scheme_type::bgv);
+
+        parms.set_poly_modulus_degree(N);
+        auto tmp = std::vector<int>{ 54, 41, 42 };
+        auto o = seal::CoeffModulus::Create(N, tmp);
+        parms.set_coeff_modulus(o);
+        parms.set_plain_modulus(seal::PlainModulus::Batching(N, 16 + 1));
+
+        return SEALContext(parms, false, sec_level_type::none, nummults);
+    }
+
     SEALContext make_128deg_context(int nummults = 2)
     {
         std::uint64_t N = 128;
@@ -114,6 +140,7 @@ namespace sealtest
 
         Ciphertext encrypted(context);
         encryptor.encrypt(plain, encrypted);
+        evaluator.transform_from_ntt_inplace(encrypted);
 
         seal::Ciphertext cpy;
         cpy = encrypted;
@@ -124,8 +151,6 @@ namespace sealtest
         seal::util::PolyIter reg_iter(cpy);
         seal::util::PolyIter padded_iter(encrypted);
 
-        std::vector<std::uint64_t> pd;
-
         SEAL_ITERATE(
             seal::util::iter(padded_iter, reg_iter), cpy.size(),
             [&](tuple<seal::util::RNSIter, seal::util::RNSIter> I) {
@@ -135,21 +160,54 @@ namespace sealtest
                 });
             });
     }
+    TEST(EvaluatorTest, PostiveWrappedNTTCiphertextPadding2)
+    {
+        std::uint64_t N = 1024;
+        auto context = make_context(N, 1);
+        auto parms = context.first_context_data()->parms();
+
+        Evaluator evaluator(context);
+
+        Plaintext ptx = random_plain(parms);
+
+        KeyGenerator keygen(context);
+        SecretKey secret_key = keygen.secret_key();
+        PublicKey pk;
+        keygen.create_public_key(pk);
+        Encryptor encryptor(context, pk);
+        Decryptor decryptor(context, keygen.secret_key());
+
+        auto plain = random_plain(parms);
+
+        Ciphertext encrypted(context);
+        encryptor.encrypt(plain, encrypted);
+        evaluator.transform_from_ntt_inplace(encrypted);
+
+        seal::Ciphertext cpy;
+        cpy = encrypted;
+
+        evaluator.zero_pad(encrypted);
+
+        // create two polynomial iterators:
+        seal::util::PolyIter reg_iter(cpy);
+        seal::util::PolyIter padded_iter(encrypted);
+
+        auto vc = dynarray_to_vector(encrypted.dyn_array());
+
+        SEAL_ITERATE(
+            seal::util::iter(padded_iter, reg_iter), cpy.size(),
+            [&](tuple<seal::util::RNSIter, seal::util::RNSIter> I) {
+                SEAL_ITERATE(seal::util::iter(std::get<0>(I), std::get<1>(I)), cpy.coeff_modulus_size(), [&](auto J) {
+                    // now check they are equal for the frst N elements., and the rest are zeros.
+                    validate_rns_poly_padding(std::get<0>(J), std::get<1>(J), N, 1);
+                });
+            });
+    }
 
     TEST(EvaluatorTest, PositiveNttConstantMonomyialMultCTx)
     {
-        std::uint64_t N = 8192;
-        seal::EncryptionParameters parms(seal::scheme_type::bgv);
-
-        parms.set_poly_modulus_degree(N);
-        //            enc.set_coeff_modulus(seal::CoeffModulus::BFVDefault(N, sec_level_type::tc192));
-
-        auto tmp = std::vector<int>{ 54, 41, 42 };
-        auto o = seal::CoeffModulus::Create(N, tmp);
-        parms.set_coeff_modulus(o);
-        parms.set_plain_modulus(seal::PlainModulus::Batching(N, 16 + 1));
-
-        SEALContext context(parms, false, sec_level_type::none, 1);
+        auto context = make_context(8192, 1);
+        auto parms = context.first_context_data()->parms();
         Evaluator evaluator(context);
 
         Plaintext ptx("2"); //(parms);
@@ -369,12 +427,41 @@ namespace sealtest
         evaluator.zero_pad(encrypted);
         evaluator.polynomial_mod(encrypted);
 
-        auto modded_vc = dynarray_to_vector(encrypted.dyn_array());
-        auto non_padded_vc = dynarray_to_vector(non_padded.dyn_array());
-        ASSERT_EQ(modded_vc.size(), non_padded_vc.size());
-        for (std::uint64_t i = 0; i < modded_vc.size(); ++i)
-        {
-            ASSERT_EQ(modded_vc[i], non_padded_vc[i]);
-        }
+        assert_eq_ciphers(encrypted, non_padded);
+    }
+
+    TEST(EvaluatorTest, postiveInverseNtt)
+    {
+        auto context = make_context(1024, 1);
+        Evaluator evaluator(context);
+
+        Plaintext ptx("2"); //(parms);
+
+        // creating encryption:
+        KeyGenerator keygen(context);
+        SecretKey secret_key = keygen.secret_key();
+        PublicKey pk;
+        keygen.create_public_key(pk);
+        Encryptor encryptor(context, pk);
+        Decryptor decryptor(context, keygen.secret_key());
+
+        Ciphertext ctx(context);
+        encryptor.encrypt(ptx, ctx);
+        evaluator.transform_from_ntt_inplace(ctx);
+        auto reg_size = dynarray_to_vector(ctx.dyn_array());
+
+        auto ctx_cpy = ctx;
+        evaluator.zero_pad(ctx_cpy);
+        // ctx here is 1024, and coefs is of size 2 , thus we should have a polynomial
+        // with the following look:
+        // [p11,p12,p21,p21]
+        // after padding it should look like [p11,0,p12,0,p21,0,p21,0]
+        auto vc_cpy = dynarray_to_vector(ctx_cpy.dyn_array());
+
+        ctx = evaluator.transform_to_positive_ntt(ctx);
+        evaluator.transform_from_positive_ntt_inplace(ctx);
+        auto vc = dynarray_to_vector(ctx.dyn_array());
+        //        evaluator.polynomial_mod(ctx);
+        assert_eq_ciphers(ctx, ctx_cpy);
     }
 } // namespace sealtest

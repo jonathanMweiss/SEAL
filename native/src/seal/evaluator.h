@@ -99,6 +99,7 @@ namespace seal
          * Modifies the given plaintext, and attempts to reallocate its data. if possible avoids copying.
          */
         void transform_to_positive_ntt_inplace(Ciphertext &encrypted) const;
+        void transform_from_positive_ntt_inplace(Ciphertext &encrypted) const;
         Ciphertext transform_to_positive_ntt(const Ciphertext &encrypted) const
         {
             Ciphertext cpy = encrypted;
