@@ -49,10 +49,10 @@ namespace sealtest
             seal::EncryptionParameters enc(seal::scheme_type::bgv);
 
             enc.set_poly_modulus_degree(N);
-            enc.set_coeff_modulus(seal::CoeffModulus::BFVDefault(N, sec_level_type::tc192));
+            enc.set_coeff_modulus(seal::CoeffModulus::BFVDefault(N, sec_level_type::tc128));
 
-//            auto tmp = std::vector<int>{ 54, 41, 42 };
-            auto tmp = std::vector<int>{ 51, 57, 57 };
+            //            auto tmp = std::vector<int>{ 54, 41, 42 };
+            vector<int> tmp = get_8192_positive_ntt_moduli();
             auto o = seal::CoeffModulus::Create(N, tmp);
             enc.set_coeff_modulus(o);
             enc.set_plain_modulus(seal::PlainModulus::Batching(N, logt + 1));
@@ -66,9 +66,14 @@ namespace sealtest
 
             return SetupObjs(enc);
         }
+        static vector<int> get_8192_positive_ntt_moduli()
+        {
+            auto tmp = vector<int>{ 41, 57, 57 };
+            return tmp;
+        }
 
         explicit SetupObjs(seal::EncryptionParameters encryption_params)
-            : enc_params(std::move(encryption_params)), context(enc_params, true, sec_level_type::tc192, 2),
+            : enc_params(std::move(encryption_params)), context(enc_params, false, sec_level_type::tc128, 2),
               evaluator(context), keygen(context), secret_key(keygen.secret_key()), encryptor(context, secret_key),
               decryptor(context, secret_key){};
 

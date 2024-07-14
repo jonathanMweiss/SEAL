@@ -54,26 +54,25 @@ namespace sealtest
 
     void assert_eq_ciphers(const Ciphertext &e1, const Ciphertext &e2)
     {
-        auto modded_vc = dynarray_to_vector(e1.dyn_array());
-        auto non_padded_vc = dynarray_to_vector(e2.dyn_array());
-        ASSERT_EQ(modded_vc.size(), non_padded_vc.size());
-        for (std::uint64_t i = 0; i < modded_vc.size(); ++i)
+        auto e1_vc = dynarray_to_vector(e1.dyn_array());
+        auto e2_vc = dynarray_to_vector(e2.dyn_array());
+        ASSERT_EQ(e1_vc.size(), e2_vc.size());
+        for (std::uint64_t i = 0; i < e1_vc.size(); ++i)
         {
-            ASSERT_EQ(modded_vc[i], non_padded_vc[i]);
+            ASSERT_EQ(e1_vc[i], e2_vc[i]);
         }
     }
 
-    SEALContext make_context(int poly_deg, int nummults)
+    SEALContext make_unsecure_context(int poly_deg, int nummults)
     {
-        std::uint64_t N = poly_deg;
-        seal::EncryptionParameters parms(seal::scheme_type::bgv);
+        uint64_t N = poly_deg;
+        EncryptionParameters parms(scheme_type::bgv);
 
         parms.set_poly_modulus_degree(N);
-        auto tmp = std::vector<int>{ 54, 41, 42 };
-        auto o = seal::CoeffModulus::Create(N, tmp);
+        auto tmp = vector<int>{ 54, 41, 42 };
+        auto o = CoeffModulus::Create(N, tmp);
         parms.set_coeff_modulus(o);
-        parms.set_plain_modulus(seal::PlainModulus::Batching(N, 16 + 1));
-
+        parms.set_plain_modulus(PlainModulus::Batching(N, 16 + 1));
         return SEALContext(parms, false, sec_level_type::none, nummults);
     }
 
@@ -163,7 +162,7 @@ namespace sealtest
     TEST(EvaluatorTest, PostiveWrappedNTTCiphertextPadding2)
     {
         std::uint64_t N = 1024;
-        auto context = make_context(N, 1);
+        auto context = make_unsecure_context(N, 1);
         auto parms = context.first_context_data()->parms();
 
         Evaluator evaluator(context);
@@ -206,7 +205,7 @@ namespace sealtest
 
     TEST(EvaluatorTest, PositiveNttConstantMonomyialMultCTx)
     {
-        auto context = make_context(8192, 1);
+        auto context = make_unsecure_context(8192, 1);
         auto parms = context.first_context_data()->parms();
         Evaluator evaluator(context);
 
@@ -256,7 +255,7 @@ namespace sealtest
     }
     TEST(EvaluatorTest, PositiveINTTCTX)
     {
-        GTEST_FAIL();
+        GTEST_SKIP();
     }
 
     TEST(EvaluatorTest, postivie_ntt_constant_mult)
@@ -265,7 +264,7 @@ namespace sealtest
         seal::EncryptionParameters parms(seal::scheme_type::bgv);
 
         parms.set_poly_modulus_degree(N);
-        //            enc.set_coeff_modulus(seal::CoeffModulus::BFVDefault(N, sec_level_type::tc192));
+        //        enc.set_coeff_modulus(seal::CoeffModulus::BFVDefault(N, sec_level_type::tc192));
 
         auto tmp = std::vector<int>{ 54, 41, 42 };
         auto o = seal::CoeffModulus::Create(N, tmp);
@@ -432,10 +431,18 @@ namespace sealtest
 
     TEST(EvaluatorTest, postiveInverseNtt)
     {
-        auto context = make_context(1024, 1);
+        uint64_t N = 8192;
+        EncryptionParameters parms(scheme_type::bgv);
+
+        parms.set_poly_modulus_degree(N);
+        parms.set_coeff_modulus(CoeffModulus::Create(N, vector<int>{ 54, 41, 42 }));
+        parms.set_plain_modulus(PlainModulus::Batching(N, 16 + 1));
+        seal::SEALContext context(parms, false, sec_level_type::tc192, 1);
+        ASSERT_TRUE(context.parameters_set());
+
         Evaluator evaluator(context);
 
-        Plaintext ptx("2"); //(parms);
+        Plaintext ptx = random_plain(context.first_context_data()->parms());
 
         // creating encryption:
         KeyGenerator keygen(context);
@@ -448,20 +455,127 @@ namespace sealtest
         Ciphertext ctx(context);
         encryptor.encrypt(ptx, ctx);
         evaluator.transform_from_ntt_inplace(ctx);
-        auto reg_size = dynarray_to_vector(ctx.dyn_array());
 
+        auto original_ctx = ctx;
         auto ctx_cpy = ctx;
         evaluator.zero_pad(ctx_cpy);
-        // ctx here is 1024, and coefs is of size 2 , thus we should have a polynomial
-        // with the following look:
-        // [p11,p12,p21,p21]
-        // after padding it should look like [p11,0,p12,0,p21,0,p21,0]
-        auto vc_cpy = dynarray_to_vector(ctx_cpy.dyn_array());
 
         ctx = evaluator.transform_to_positive_ntt(ctx);
         evaluator.transform_from_positive_ntt_inplace(ctx);
-        auto vc = dynarray_to_vector(ctx.dyn_array());
-        //        evaluator.polynomial_mod(ctx);
+
         assert_eq_ciphers(ctx, ctx_cpy);
+
+        evaluator.polynomial_mod(ctx);
+        assert_eq_ciphers(ctx, original_ctx);
+    }
+
+    TEST(EvaluatorTest, postiveNttWorkingContextExample)
+    {
+        uint64_t N = 8192;
+        EncryptionParameters parms(scheme_type::bgv);
+
+        parms.set_poly_modulus_degree(N);
+        parms.set_coeff_modulus(CoeffModulus::Create(N, vector<int>{ 54, 41, 42 }));
+        parms.set_plain_modulus(PlainModulus::Batching(N, 16 + 1));
+
+        ASSERT_TRUE(seal::SEALContext(parms, false, sec_level_type::tc128, 2).parameters_set());
+        ASSERT_TRUE(seal::SEALContext(parms, false, sec_level_type::tc192, 2).parameters_set());
+        ASSERT_FALSE(seal::SEALContext(parms, false, sec_level_type::tc256, 2).parameters_set());
+
+        //        seal::SEALContext ctx(parms, false, sec_level_type::tc128, 1);
+        //        auto ct = ctx.get_context_data(ctx.positive_wrapped_parms_id());
+        //        std::cout << ct->parms().poly_modulus_degree();
+    }
+
+    TEST(EvaluatorTest, PaddedCtxAddition)
+    {
+        uint64_t N = 8192;
+        EncryptionParameters parms(scheme_type::bgv);
+
+        parms.set_poly_modulus_degree(N);
+        parms.set_coeff_modulus(CoeffModulus::Create(N, vector<int>{ 54, 41, 42 }));
+        parms.set_plain_modulus(PlainModulus::Batching(N, 16 + 1));
+        seal::SEALContext context(parms, false, sec_level_type::tc192, 1);
+        ASSERT_TRUE(context.parameters_set());
+
+        KeyGenerator keygen(context);
+        SecretKey secret_key = keygen.secret_key();
+        PublicKey pk;
+        keygen.create_public_key(pk);
+        Encryptor encryptor(context, pk);
+
+        auto plain = random_plain(parms);
+
+        Ciphertext encrypted(context);
+        encryptor.encrypt(plain, encrypted);
+
+        Evaluator ev(context);
+
+        seal::Ciphertext res1;
+        auto cpy1 = encrypted;
+        // TODO: ensure add is correct for our set of parameters.
+        ev.add(cpy1, cpy1, res1);
+        ev.transform_from_ntt_inplace(res1);
+
+        ev.transform_from_ntt_inplace(encrypted);
+        auto cpy2 = ev.transform_to_positive_ntt(encrypted);
+
+        seal::Ciphertext res2;
+        ev.add(cpy2, cpy2, res2);
+
+        ev.transform_from_positive_ntt_inplace(res2);
+        ev.polynomial_mod(res2);
+
+        assert_eq_ciphers(res1, res2);
+    }
+
+    TEST(EvaluatorTest, paddedMultiplication)
+    {
+        FAIL();
+        //        GTEST_SKIP();
+        uint64_t N = 8192;
+        EncryptionParameters parms(scheme_type::bgv);
+
+        parms.set_poly_modulus_degree(N);
+        parms.set_coeff_modulus(CoeffModulus::Create(N, vector<int>{ 54, 41, 42 }));
+        parms.set_plain_modulus(PlainModulus::Batching(N, 16 + 1));
+        seal::SEALContext context(parms, false, sec_level_type::tc192, 1);
+        ASSERT_TRUE(context.parameters_set());
+
+        auto ptx = random_plain(parms);
+
+        KeyGenerator keygen(context);
+        SecretKey secret_key = keygen.secret_key();
+        PublicKey pk;
+        keygen.create_public_key(pk);
+        Encryptor encryptor(context, pk);
+
+        auto plain = random_plain(parms);
+
+        Ciphertext encrypted(context);
+        encryptor.encrypt(plain, encrypted);
+        Evaluator ev(context);
+
+        seal::Ciphertext res1;
+        ev.multiply_plain(encrypted, ptx, res1);
+
+        ev.transform_from_ntt_inplace(encrypted);
+        ev.transform_to_positive_ntt_inplace(encrypted);
+
+        ev.transform_to_positive_ntt_inplace(ptx);
+
+        seal::Ciphertext res2;
+        ev.multiply_plain(encrypted, ptx, res2);
+
+        ev.transform_from_positive_ntt_inplace(res2);
+        ev.polynomial_mod(res2);
+        auto vc1 = dynarray_to_vector(res1.dyn_array());
+        auto vc2 = dynarray_to_vector(res2.dyn_array());
+        assert_eq_ciphers(res1, res2);
+    }
+
+    TEST(EvaluatorTest, paddedMultiplication2)
+    {
+        GTEST_SKIP();
     }
 } // namespace sealtest

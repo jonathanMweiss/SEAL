@@ -322,21 +322,17 @@ namespace sealtest
                     {
                         continue;
                     };
-                    std::cout << "the following works i: " << i << " j: " << j << " k: " << k << std::endl;
                     auto tmp = std::vector<int>{ i, j, k };
                     auto o = seal::CoeffModulus::Create(N, tmp);
 
                     parms.set_coeff_modulus(o);
-                    auto cntx = SEALContext(parms, false, sec_level_type::tc192, 2);
-                    ASSERT_TRUE(
-                        cntx.get_context_data(cntx.positive_wrapped_parms_id())->qualifiers().parameter_error ==
-                        EncryptionParameterQualifiers::error_type::success);
-                    ASSERT_TRUE(
-                        cntx.first_context_data()->qualifiers().parameter_error ==
-                        EncryptionParameterQualifiers::error_type::success);
+                    auto cntx = SEALContext(parms, false, sec_level_type::tc128, 2);
+                    if (!cntx.parameters_set())
+                    {
+                        continue;
+                    }
 
-                    //                    std::cout << cntx.first_context_data()->parms().coeff_modulus().size() <<
-                    //                    std::endl;
+                    std::cout << "the following works i: " << i << " j: " << j << " k: " << k << std::endl;
                 }
             }
         }

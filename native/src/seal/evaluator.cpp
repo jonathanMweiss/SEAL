@@ -3001,7 +3001,6 @@ namespace seal
                 for (std::uint64_t i = 0; i < reg_coeff_count; ++i)
                 {
                     *d_ptr = *s_ptr;
-                    *s_ptr = 0;
                     ++d_ptr;
                     ++s_ptr;
                 }
