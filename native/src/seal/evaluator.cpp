@@ -2978,17 +2978,35 @@ namespace seal
         auto &context_data = *context_.get_context_data(parms_id);
         auto &parms = context_data.parms();
         auto &coeff_modulus = parms.coeff_modulus();
-        size_t coeff_count = parms.poly_modulus_degree();
+        size_t reg_coeff_count = parms.poly_modulus_degree();
         size_t coeff_modulus_size = coeff_modulus.size();
 
         size_t padded_polys_coeff_count =
             context_.get_context_data(context_.positive_wrapped_parms_id())->parms().poly_modulus_degree();
         // resize sets everything with zeros.
-        plain.resize(padded_polys_coeff_count * coeff_modulus_size);
+        seal::Plaintext res;
+        res.resize(padded_polys_coeff_count * coeff_modulus_size);
 
-        std::uint64_t *bgin = plain.data();
-        // from same location to the same location. but padded.
-        pad_polynomial(bgin, bgin, coeff_count, coeff_modulus_size, padded_polys_coeff_count);
+        seal::util::RNSIter reg_poly_iter(plain.data(), reg_coeff_count);
+        seal::util::RNSIter padded_poly_iter(res.data(), padded_polys_coeff_count);
+
+        SEAL_ITERATE(
+            seal::util::iter(reg_poly_iter, padded_poly_iter), coeff_modulus_size,
+            [&](tuple<PtrIter<uint64_t *>, PtrIter<uint64_t *>> I) {
+                std::uint64_t *s_ptr = std::get<0>(I).ptr();
+                std::uint64_t *d_ptr = std::get<1>(I).ptr();
+
+//                memcpy(d_ptr, s_ptr, reg_coeff_count);
+//                memset(s_ptr, 0, reg_coeff_count);
+                for (std::uint64_t i = 0; i < reg_coeff_count; ++i)
+                {
+                    *d_ptr = *s_ptr;
+                    *s_ptr = 0;
+                    ++d_ptr;
+                    ++s_ptr;
+                }
+            });
+        plain = std::move(res);
         return;
     }
 
