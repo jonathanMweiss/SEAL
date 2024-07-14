@@ -531,13 +531,12 @@ namespace sealtest
 
     TEST(EvaluatorTest, paddedMultiplication)
     {
-        FAIL();
         //        GTEST_SKIP();
         uint64_t N = 8192;
         EncryptionParameters parms(scheme_type::bgv);
 
         parms.set_poly_modulus_degree(N);
-        parms.set_coeff_modulus(CoeffModulus::Create(N, vector<int>{ 54, 41, 42 }));
+        parms.set_coeff_modulus(CoeffModulus::Create(N, SetupObjs::get_8192_positive_ntt_moduli()));
         parms.set_plain_modulus(PlainModulus::Batching(N, 16 + 1));
         seal::SEALContext context(parms, false, sec_level_type::tc192, 1);
         ASSERT_TRUE(context.parameters_set());
@@ -558,6 +557,7 @@ namespace sealtest
 
         seal::Ciphertext res1;
         ev.multiply_plain(encrypted, ptx, res1);
+        ev.transform_from_ntt_inplace(res1);
 
         ev.transform_from_ntt_inplace(encrypted);
         ev.transform_to_positive_ntt_inplace(encrypted);
@@ -569,13 +569,52 @@ namespace sealtest
 
         ev.transform_from_positive_ntt_inplace(res2);
         ev.polynomial_mod(res2);
-        auto vc1 = dynarray_to_vector(res1.dyn_array());
-        auto vc2 = dynarray_to_vector(res2.dyn_array());
+
         assert_eq_ciphers(res1, res2);
     }
 
+    // test whether multiplying ctx with ptx then with ctx is the same with padded_ntt.
     TEST(EvaluatorTest, paddedMultiplication2)
     {
-        GTEST_SKIP();
+        //        GTEST_SKIP();
+        uint64_t N = 8192;
+        EncryptionParameters parms(scheme_type::bgv);
+
+        parms.set_poly_modulus_degree(N);
+        parms.set_coeff_modulus(CoeffModulus::Create(N, SetupObjs::get_8192_positive_ntt_moduli()));
+        parms.set_plain_modulus(PlainModulus::Batching(N, 16 + 1));
+        seal::SEALContext context(parms, false, sec_level_type::tc128, 2);
+        ASSERT_TRUE(context.parameters_set());
+
+        auto ptx = random_plain(parms);
+
+        KeyGenerator keygen(context);
+        SecretKey secret_key = keygen.secret_key();
+        PublicKey pk;
+        keygen.create_public_key(pk);
+        Encryptor encryptor(context, pk);
+
+        Ciphertext encrypted(context);
+        encryptor.encrypt(random_plain(parms), encrypted);
+        Evaluator ev(context);
+
+        Ciphertext tmp, res1;
+        ev.multiply_plain(encrypted, ptx, tmp);
+        ev.multiply(encrypted, tmp, res1);
+        ev.transform_from_ntt_inplace(res1);
+
+        ev.transform_from_ntt_inplace(encrypted);
+        ev.transform_to_positive_ntt_inplace(encrypted);
+
+        ev.transform_to_positive_ntt_inplace(ptx);
+
+        seal::Ciphertext tmp2, res2;
+        ev.multiply_plain(encrypted, ptx, tmp2);
+        ev.multiply(encrypted, tmp2, res2);
+
+        ev.transform_from_positive_ntt_inplace(res2);
+        ev.polynomial_mod(res2);
+
+        assert_eq_ciphers(res1, res2);
     }
 } // namespace sealtest
