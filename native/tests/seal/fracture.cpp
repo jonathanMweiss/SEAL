@@ -109,7 +109,7 @@ namespace sealtest::fracture
             seal::util::matrix<Ciphertext> query_left(1, vec_size, random_ctx_vector(all, int(vec_size)));
             apply_on_each_element<Ciphertext>(
                 query_right, [&](Ciphertext &c) -> void { all.evaluator.transform_from_ntt_inplace(c); });
-            //            //            seal::util::matrix<Plaintext> db(vec_size, vec_size, random_ptxs(all,
+            //            //            seal::util::matrix<Plaintext> db(vec_size, vec_size, random_ntt_ptxs(all,
             //            int(vec_size *
             //            //            vec_size)));
             //
@@ -273,7 +273,7 @@ namespace sealtest::fracture
             auto num_ctxs = 50;
 
             std::vector<seal::Ciphertext> ctxs = random_ctx_vector(all, num_ctxs);
-            std::vector<seal::Plaintext> ptxs = random_ptxs(all, num_ctxs);
+            std::vector<seal::Plaintext> ptxs = random_ntt_ptxs(all, num_ctxs);
 
             std::vector<seal::fractures::CiphertextShredder> ctxs_fracs;
             std::vector<seal::fractures::Polynomial> ptxs_fracs;
@@ -470,7 +470,7 @@ namespace sealtest::fracture
             seal::util::matrix<Ciphertext> query_right(vec_size, 1, random_ctx_vector(all, int(vec_size)));
             seal::util::matrix<Ciphertext> query_left(1, vec_size, random_ctx_vector(all, int(vec_size)));
 
-            seal::util::matrix<Plaintext> db(vec_size, vec_size, random_ptxs(all, int(vec_size * vec_size)));
+            seal::util::matrix<Plaintext> db(vec_size, vec_size, random_ntt_ptxs(all, int(vec_size * vec_size)));
 
             auto ctx_vector = multiplyMatrices(all, db, query_right);
             auto response = multiplyMatrices(all, query_left, ctx_vector);

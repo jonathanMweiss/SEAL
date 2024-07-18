@@ -40,6 +40,7 @@ namespace sealtest
 
         /**
          * The following parameters are chosen to support ctx-ctx multiplication and still have budget left.
+         * In addition, these parameters are chosen to support padded multiplication.
          * @param N
          * @param logt
          * @return
@@ -118,6 +119,7 @@ namespace sealtest
     };
 
     std::vector<seal::Ciphertext> random_ctx_vector(const SetupObjs &all, int size);
+    std::vector<seal::Plaintext> random_ntt_ptxs(const SetupObjs &all, int size);
     std::vector<seal::Plaintext> random_ptxs(const SetupObjs &all, int size);
 
     seal::Ciphertext ctxWithSize3(const SetupObjs &all);
@@ -130,7 +132,20 @@ namespace sealtest
         const seal::util::matrix<V> &right)
     {
         seal::Ciphertext tmp;
-        seal::Ciphertext tmp_result(all.context);
+        seal::Ciphertext tmp_result;
+
+        auto parms_id = left.data[0].parms_id();
+        auto sz = 2;
+        if constexpr ((std::is_same_v<U, seal::Plaintext>))
+        {
+            parms_id = right.data[0].parms_id();
+        }
+        if constexpr ((std::is_same_v<U, seal::Ciphertext> && std::is_same_v<V, seal::Ciphertext>))
+        {
+            sz = 3;
+        }
+
+        tmp_result.resize(all.context, parms_id, sz);
         tmp_result.is_ntt_form() = true;
 
         // assume that in seal::Plaintext case we don't want to turn into splitPlaintexts

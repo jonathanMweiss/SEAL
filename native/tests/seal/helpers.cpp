@@ -33,12 +33,22 @@ namespace sealtest
         return ctxs;
     }
 
-    std::vector<seal::Plaintext> random_ptxs(const SetupObjs &all, int size)
+    std::vector<seal::Plaintext> random_ntt_ptxs(const SetupObjs &all, int size)
     {
         std::vector<seal::Plaintext> ptxs;
         for (int i = 0; i < size; ++i)
         {
             ptxs.push_back(all.random_ntt_plaintext());
+        }
+        return ptxs;
+    }
+
+    std::vector<seal::Plaintext> random_ptxs(const SetupObjs &all, int size)
+    {
+        std::vector<seal::Plaintext> ptxs;
+        for (int i = 0; i < size; ++i)
+        {
+            ptxs.push_back(all.random_plaintext());
         }
         return ptxs;
     }

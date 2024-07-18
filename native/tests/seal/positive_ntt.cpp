@@ -620,8 +620,40 @@ namespace sealtest
 
     TEST(EvaluatorTest, padded_mat_mult)
     {
-//        mat_mult()
-        FAIL();
+        auto all = SetupObjs::New();
+
+        std::uint64_t size = 2;
+
+        seal::util::matrix<Ciphertext> query_right(size, 1, random_ctx_vector(all, int(size)));
+        seal::util::matrix<Ciphertext> query_left(1, size, random_ctx_vector(all, int(size)));
+
+        seal::util::matrix<Plaintext> db(size, size, random_ptxs(all, int(size * size)));
+        auto db_cpy1 = db;
+
+        apply_on_each_element<Plaintext>(db_cpy1, [&](Plaintext &p) -> void {
+            all.evaluator.transform_to_ntt_inplace(p, all.context.first_parms_id());
+        });
+        auto reg_ntt_res = multiplyMatrices(all, multiplyMatrices(all, query_left, db_cpy1), query_right).data[0];
+        all.evaluator.transform_from_ntt_inplace(reg_ntt_res);
+
+        // let us transform these guys to positive ntt.
+        apply_on_each_element<Ciphertext>(query_left, [&](Ciphertext &c) -> void {
+            all.evaluator.transform_from_ntt_inplace(c);
+            all.evaluator.transform_to_positive_ntt_inplace(c);
+        });
+        apply_on_each_element<Ciphertext>(query_right, [&](Ciphertext &c) -> void {
+            all.evaluator.transform_from_ntt_inplace(c);
+            all.evaluator.transform_to_positive_ntt_inplace(c);
+        });
+        apply_on_each_element<Plaintext>(
+            db, [&](Plaintext &p) -> void { all.evaluator.transform_to_positive_ntt_inplace(p); });
+
+        auto tmp = multiplyMatrices(all, query_left, db);
+        auto padded_ntt_res = multiplyMatrices(all, tmp, query_right).data[0];
+        all.evaluator.transform_from_positive_ntt_inplace(padded_ntt_res);
+
+        all.evaluator.polynomial_mod(padded_ntt_res);
+        assert_eq_ciphers(reg_ntt_res, padded_ntt_res);
     }
 
     TEST(EvaluatorTest, paddedMultSZ)
