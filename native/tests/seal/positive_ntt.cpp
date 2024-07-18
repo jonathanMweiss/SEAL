@@ -656,8 +656,36 @@ namespace sealtest
         assert_eq_ciphers(reg_ntt_res, padded_ntt_res);
     }
 
-    TEST(EvaluatorTest, paddedMultSZ)
+    TEST(EvaluatorTest, paddedMultSZ1)
     {
-        FAIL();
+        auto all = SetupObjs::New();
+
+        std::vector<uint64_t> point = { 1, 2 };
+        auto ptx = all.random_plaintext();
+
+        seal::fractures::PolynomialEvaluator pv(all.context);
+        auto ptx_ev = pv.evaluate(seal::Plaintext(ptx), point);
+
+        Ciphertext encrypted = all.random_ciphertext();
+
+        seal::Ciphertext res1;
+        all.evaluator.multiply_plain(encrypted, ptx, res1);
+        all.evaluator.transform_from_ntt_inplace(res1);
+
+        all.evaluator.transform_from_ntt_inplace(encrypted);
+        auto ctx_ev = pv.evaluate(seal::Ciphertext(encrypted), point);
+        all.evaluator.transform_to_positive_ntt_inplace(encrypted);
+
+        all.evaluator.transform_to_positive_ntt_inplace(ptx);
+
+        seal::Ciphertext res2;
+        all.evaluator.multiply_plain(encrypted, ptx, res2);
+
+        all.evaluator.transform_from_positive_ntt_inplace(res2);
+        auto res_ev = pv.evaluate(seal::Ciphertext(res2), point);
+        all.evaluator.polynomial_mod(res2);
+
+        assert_eq_ciphers(res1, res2);
+        ASSERT_TRUE(((ptx_ev * ctx_ev) == res_ev));
     }
 } // namespace sealtest

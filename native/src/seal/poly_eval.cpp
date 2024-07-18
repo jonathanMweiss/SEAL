@@ -25,7 +25,8 @@ namespace seal::fractures
 
         auto &parms = ctx_data->parms();
         return evaluate_singe_RNS_polynomial(
-            seal::util::ConstRNSIter(p.data(), parms.poly_modulus_degree()), parms.coeff_modulus(), value);
+            seal::util::ConstRNSIter(p.data(), parms.poly_modulus_degree()), parms.coeff_modulus(), value,
+            context.first_parms_id());
     }
 
     EvaluatedCipherPoint PolynomialEvaluator::evaluate(
@@ -47,7 +48,7 @@ namespace seal::fractures
 
         std::uint64_t i = 0;
         SEAL_ITERATE(seal::util::ConstPolyIter(ctx), ctx.size(), [&](seal::util::ConstRNSIter iter) {
-            result.poly_fracs[i] = evaluate_singe_RNS_polynomial(iter, coeff_modulus, value);
+            result.poly_fracs[i] = evaluate_singe_RNS_polynomial(iter, coeff_modulus, value, ctx.parms_id());
             i++;
         });
 
@@ -70,10 +71,11 @@ namespace seal::fractures
     }
 
     EvaluatedPoint PolynomialEvaluator::evaluate_singe_RNS_polynomial(
-        seal::util::ConstRNSIter rns_iter, const std::vector<seal::Modulus> &modulus,
-        const std::vector<std::uint64_t> &value) const
+        util::ConstRNSIter rns_iter, const std::vector<seal::Modulus> &modulus, const std::vector<std::uint64_t> &value,
+        const parms_id_type p_id) const
     {
-        auto poly_degree = context.first_context_data()->parms().poly_modulus_degree();
+        // TODO: must use relevant context, for instance - padded ctx have different contexr!
+        auto poly_degree = context.get_context_data(p_id)->parms().poly_modulus_degree();
         std::vector<std::uint64_t> result_vec(modulus.size());
 
         uint64_t i = 0;
