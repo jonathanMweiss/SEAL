@@ -538,7 +538,7 @@ namespace sealtest
         parms.set_poly_modulus_degree(N);
         parms.set_coeff_modulus(CoeffModulus::Create(N, SetupObjs::get_8192_positive_ntt_moduli()));
         parms.set_plain_modulus(PlainModulus::Batching(N, 16 + 1));
-        seal::SEALContext context(parms, false, sec_level_type::tc192, 1);
+        seal::SEALContext context(parms, false, sec_level_type::tc128, 1);
         ASSERT_TRUE(context.parameters_set());
 
         auto ptx = random_plain(parms);
@@ -616,5 +616,16 @@ namespace sealtest
         ev.polynomial_mod(res2);
 
         assert_eq_ciphers(res1, res2);
+    }
+
+    TEST(EvaluatorTest, padded_mat_mult)
+    {
+//        mat_mult()
+        FAIL();
+    }
+
+    TEST(EvaluatorTest, paddedMultSZ)
+    {
+        FAIL();
     }
 } // namespace sealtest
