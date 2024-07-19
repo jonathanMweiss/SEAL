@@ -52,17 +52,6 @@ namespace sealtest
         }
     }
 
-    void assert_eq_ciphers(const Ciphertext &e1, const Ciphertext &e2)
-    {
-        auto e1_vc = dynarray_to_vector(e1.dyn_array());
-        auto e2_vc = dynarray_to_vector(e2.dyn_array());
-        ASSERT_EQ(e1_vc.size(), e2_vc.size());
-        for (std::uint64_t i = 0; i < e1_vc.size(); ++i)
-        {
-            ASSERT_EQ(e1_vc[i], e2_vc[i]);
-        }
-    }
-
     SEALContext make_unsecure_context(int poly_deg, int nummults)
     {
         uint64_t N = poly_deg;

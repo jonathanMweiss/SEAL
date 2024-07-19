@@ -254,4 +254,5 @@ namespace sealtest
     std::vector<std::uint64_t> dynarray_to_vector(const seal::DynArray<std::uint64_t> &dyn);
     std::vector<std::uint64_t> plain_to_vector(const Plaintext &ptx);
 
+    void assert_eq_ciphers(const Ciphertext &e1, const Ciphertext &e2);
 } // namespace sealtest
