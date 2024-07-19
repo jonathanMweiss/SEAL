@@ -27,31 +27,6 @@ using namespace std;
 namespace sealtest::fracture
 {
 
-    namespace regntt
-    {
-
-        TEST(nonNegacyclicNTT, ctx)
-        {
-            // TODO , test in the evaluator tests..
-            // take the RNS of a specific modulus, then
-            // TRY feeding their "lazy" ntt function with larger values.
-
-            //            GTEST_SKIP();
-        }
-
-        //        std::vector<std::uint64_t> into_vector(const seal::Plaintext &padded, std::uint64_t sz)
-        //        {
-        //            seal::util::ConstRNSIter padded_itr(padded.data(), sz);
-        //            std::vector<std::uint64_t> ret;
-        //            ret.reserve(sz);
-        //
-        //            SEAL_ITERATE(seal::util::iter(padded_itr), 1, [&](auto I) {
-        //                SEAL_ITERATE(I, sz, [&](auto &J) { ret.emplace_back(J); });
-        //            });
-        //            return ret;
-        //        }
-    } // namespace regntt
-
     namespace polyval
     {
 
@@ -154,11 +129,11 @@ namespace sealtest::fracture
             all.evaluator.multiply_plain_inplace(encrypted_ntt, ptx);
             ASSERT_TRUE(!encrypted_ntt.is_transparent());
 
-            all.evaluator.sub_inplace(encrypted_ntt, cshredder.into_ciphertext());
+            all.evaluator.sub_inplace(encrypted_ntt, cshredder.into_ciphertext(all.context.first_parms_id()));
             ASSERT_TRUE(encrypted_ntt.is_transparent());
 
             seal::Plaintext ptx_res;
-            all.decryptor.decrypt(cshredder.into_ciphertext(), ptx_res);
+            all.decryptor.decrypt(cshredder.into_ciphertext(all.context.first_parms_id()), ptx_res);
         }
 
         TEST(FracturedOps, addCtxSize2)
@@ -177,7 +152,7 @@ namespace sealtest::fracture
             all.evaluator.add_inplace(ctx1, ctx2);
             ASSERT_TRUE(!ctx1.is_transparent());
 
-            all.evaluator.sub_inplace(ctx1, ctxshred1.into_ciphertext());
+            all.evaluator.sub_inplace(ctx1, ctxshred1.into_ciphertext(all.context.first_parms_id()));
             ASSERT_TRUE(ctx1.is_transparent());
         }
 
@@ -214,7 +189,7 @@ namespace sealtest::fracture
             all.evaluator.add_inplace(ctx1, ctx2);
             ASSERT_TRUE(!ctx1.is_transparent());
 
-            all.evaluator.sub_inplace(ctx1, ctxshred1.into_ciphertext());
+            all.evaluator.sub_inplace(ctx1, ctxshred1.into_ciphertext(all.context.first_parms_id()));
             ASSERT_TRUE(ctx1.is_transparent());
         }
 
@@ -237,7 +212,7 @@ namespace sealtest::fracture
             all.evaluator.add_inplace(ctx1, ctx2);
             ASSERT_TRUE(!ctx1.is_transparent());
 
-            all.evaluator.sub_inplace(ctx1, ctxshred1.into_ciphertext());
+            all.evaluator.sub_inplace(ctx1, ctxshred1.into_ciphertext(all.context.first_parms_id()));
             ASSERT_FALSE(ctx1.is_transparent());
         }
 
@@ -262,7 +237,7 @@ namespace sealtest::fracture
             all.evaluator.multiply_plain_inplace(encrypted_ntt, ptx);
             ASSERT_TRUE(!encrypted_ntt.is_transparent());
 
-            all.evaluator.sub_inplace(encrypted_ntt, cshredder.into_ciphertext());
+            all.evaluator.sub_inplace(encrypted_ntt, cshredder.into_ciphertext(all.context.first_parms_id()));
             ASSERT_FALSE(encrypted_ntt.is_transparent());
         }
 
@@ -301,7 +276,7 @@ namespace sealtest::fracture
                 add_inplace_ctx_fractures(ctxs_fracs[0], ctxs_fracs[i]);
             }
 
-            auto actual_result = ctxs_fracs[0].into_ciphertext();
+            auto actual_result = ctxs_fracs[0].into_ciphertext(all.context.first_parms_id());
             ASSERT_TRUE(!actual_result.is_transparent());
             ASSERT_TRUE(!ctxs[0].is_transparent());
 
@@ -330,7 +305,7 @@ namespace sealtest::fracture
             }
 
             // into ctx is probably okay because i've seen it decompose correctly when it has size >2.
-            all.evaluator.sub_inplace(expected, ctxshred1.into_ciphertext());
+            all.evaluator.sub_inplace(expected, ctxshred1.into_ciphertext(all.context.first_parms_id()));
             ASSERT_TRUE(expected.is_transparent());
         }
 
@@ -363,7 +338,7 @@ namespace sealtest::fracture
             }
 
             // compare:
-            all.evaluator.sub_inplace(ctx1, ctxshred1.into_ciphertext());
+            all.evaluator.sub_inplace(ctx1, ctxshred1.into_ciphertext(all.context.first_parms_id()));
             ASSERT_TRUE(ctx1.is_transparent());
         }
 
@@ -394,7 +369,7 @@ namespace sealtest::fracture
             }
 
             //    compare:
-            all.evaluator.sub_inplace(expected(0, 0), result.into_ciphertext());
+            all.evaluator.sub_inplace(expected(0, 0), result.into_ciphertext(all.context.first_parms_id()));
             ASSERT_TRUE(expected(0, 0).is_transparent());
         }
 
@@ -425,7 +400,7 @@ namespace sealtest::fracture
             }
 
             // compare:
-            all.evaluator.sub_inplace(expected[0], actual[0].into_ciphertext());
+            all.evaluator.sub_inplace(expected[0], actual[0].into_ciphertext(all.context.first_parms_id()));
             ASSERT_TRUE(expected[0].is_transparent());
         }
 
@@ -451,7 +426,7 @@ namespace sealtest::fracture
             all.evaluator.multiply_plain_inplace(ctx1, ptx);
             all.evaluator.multiply_inplace(ctx1, ctx2);
 
-            auto result = ctxshred1.into_ciphertext();
+            auto result = ctxshred1.into_ciphertext(all.context.first_parms_id());
             all.evaluator.sub_inplace(result, ctx1);
             ASSERT_TRUE(result.is_transparent());
         }
@@ -491,10 +466,63 @@ namespace sealtest::fracture
             }
 
             // compare:
-            all.evaluator.sub_inplace(response(0, 0), composit.into_ciphertext());
+            all.evaluator.sub_inplace(response(0, 0), composit.into_ciphertext(all.context.first_parms_id()));
             ASSERT_TRUE(response(0, 0).is_transparent());
             std::cout << "Noise budget: " << all.decryptor.invariant_noise_budget(response(0, 0)) << std::endl;
             ASSERT_TRUE(all.decryptor.invariant_noise_budget(response(0, 0)) > 0);
+        }
+
+        TEST(FracturedOps, FracturePaddedNtt)
+        {
+            auto all = SetupObjs::New();
+            std::uint64_t num_fractures = 1;
+
+            auto ctx = all.random_ciphertext();
+
+            all.evaluator.transform_from_ntt_inplace(ctx);
+            all.evaluator.transform_to_positive_ntt_inplace(ctx);
+
+            auto ctx_shred = fractures::CiphertextShredder(ctx, all.context, num_fractures);
+            auto new_ctx = ctx_shred.into_ciphertext(all.context.positive_wrapped_parms_id());
+
+            assert_eq_ciphers(ctx, new_ctx);
+
+            // Checking correctness of the fractures by performing multiplication and expecting it to equal to the
+            // padded result.
+            seal::Plaintext ptx("2");
+
+            seal::Ciphertext encrypted_ntt;
+            all.encryptor.encrypt_symmetric(ptx, encrypted_ntt);
+
+            all.evaluator.transform_to_positive_ntt_inplace(ptx);
+            all.evaluator.transform_from_ntt_inplace(encrypted_ntt);
+            all.evaluator.transform_to_positive_ntt_inplace(encrypted_ntt);
+
+            seal::fractures::CiphertextShredder cshredder(encrypted_ntt, all.context, num_fractures);
+            seal::fractures::Polynomial pshredder(ptx, all.context, num_fractures);
+
+            // perform fractured multiplication:
+            for (std::uint64_t i = 0; i < num_fractures; ++i)
+            {
+                cshredder[i] *= pshredder.get_fracture(i);
+            }
+
+            // regular multiplication and then we'll compare them:
+            ASSERT_TRUE(encrypted_ntt.parms_id() == all.context.positive_wrapped_parms_id());
+            ASSERT_TRUE(ptx.parms_id() == all.context.positive_wrapped_parms_id());
+            all.evaluator.multiply_plain_inplace(encrypted_ntt, ptx);
+            ASSERT_TRUE(!encrypted_ntt.is_transparent());
+
+            assert_eq_ciphers(encrypted_ntt, cshredder.into_ciphertext(all.context.positive_wrapped_parms_id()));
+
+            seal::Plaintext ptx_res;
+            auto res = cshredder.into_ciphertext(all.context.positive_wrapped_parms_id());
+            all.evaluator.transform_from_positive_ntt_inplace(res);
+            all.evaluator.polynomial_mod(res);
+            all.evaluator.transform_to_ntt_inplace(res);
+            all.decryptor.decrypt(res, ptx_res);
+
+            ASSERT_TRUE(ptx_res.to_string() == "4");
         }
     } // namespace operations
 
