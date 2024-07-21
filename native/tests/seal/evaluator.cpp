@@ -14,6 +14,7 @@
 #include <ctime>
 #include <string>
 #include "gtest/gtest.h"
+#include "helpers.h"
 
 using namespace seal;
 using namespace std;

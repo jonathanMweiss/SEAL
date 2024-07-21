@@ -1,4 +1,5 @@
 #pragma once
+#include "evaluator.h"
 #include "fractured_ciphertext.h"
 #include "fractured_polynomial.h"
 
@@ -18,7 +19,7 @@ namespace seal::fractures
     class PolynomialEvaluator
     {
     public:
-        PolynomialEvaluator(const SEALContext &ctx) : context(ctx){};
+        PolynomialEvaluator(const SEALContext &ctx) : context(ctx), ev(ctx){};
 
         EvaluatedPoint evaluate(seal::Plaintext &p, std::vector<std::uint64_t> &&value) const
         {
@@ -76,10 +77,11 @@ namespace seal::fractures
 
     private:
         EvaluatedPoint evaluate_singe_RNS_polynomial(
-            seal::util::ConstRNSIter rns_iter, const std::vector<seal::Modulus> &modulus,
-            const std::vector<std::uint64_t> &value) const;
+            util::ConstRNSIter rns_iter, const std::vector<seal::Modulus> &modulus,
+            const std::vector<std::uint64_t> &value, const parms_id_type array) const;
 
         SEALContext context;
+        seal::Evaluator ev;
         void validate_value_to_evaluate(
             const std::vector<std::uint64_t> &value, const std::vector<Modulus> &coeff_modulus) const;
     };

@@ -1,6 +1,7 @@
 #pragma once
 
-#include "seal/fractures.h"
+#include "seal/fractured_ciphertext.h"
+#include "seal/fractured_polynomial.h"
 #include <seal/util/polyarithsmallmod.h>
 
 namespace seal::fractures
@@ -93,8 +94,8 @@ namespace seal::fractures
          * @return
          **/
         static seal::Ciphertext into_ciphertext(
-            const std::vector<CiphertextFracture> &ctx_parts, const seal::SEALContext &context,
-            const parms_id_type parms_id);
+            const std::vector<CiphertextFracture> &ctx_parts, const SEALContext &context,
+            const parms_id_type &parms_id);
     };
 
     /**
@@ -115,8 +116,12 @@ namespace seal::fractures
             return ctx_parts[index];
         }
 
-        // todo: func that turns this shredder back to full ciphertext.
-        seal::Ciphertext into_ciphertext() const;
+//        inline seal::Ciphertext into_ciphertext() const
+//        {
+//            return into_ciphertext(context.first_parms_id());
+//        }
+
+        seal::Ciphertext into_ciphertext(const parms_id_type &parms_id) const;
 
         uint64_t num_fractures();
 

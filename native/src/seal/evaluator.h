@@ -75,6 +75,48 @@ namespace seal
     {
     public:
         /**
+         * pads each polynomial with zeros in preparation for positive-cyclic NTT.
+         */
+        void zero_pad(Plaintext &plain, const parms_id_type &parms_id) const;
+        void zero_pad(Ciphertext &encrypted) const;
+
+        /**
+         * Takes a ciphertext, and applies X^n+1 modulus on the inner structure of the the ctx.
+         * It performs the operation inplace and then release unneeded emory back to the pool.
+         * @param encrypted
+         */
+        void polynomial_mod(Ciphertext &encrypted) const;
+        void polynomial_mod(Plaintext &encrypted) const;
+
+        /**
+         * Transform to NTT, but instead of using negacyclic-ntt, uses conventional NTT, with padding.
+         * Modifies the given plaintext, and attempts to reallocate its data. if possible avoids copying.
+         */
+        void transform_to_positive_ntt_inplace(Plaintext &plain) const;
+
+        /**
+         * Transform to NTT, but instead of using negacyclic-ntt, uses conventional NTT, with padding.
+         * Modifies the given plaintext, and attempts to reallocate its data. if possible avoids copying.
+         */
+        void transform_to_positive_ntt_inplace(Ciphertext &encrypted) const;
+        void transform_from_positive_ntt_inplace(Ciphertext &encrypted) const;
+        Ciphertext transform_to_positive_ntt(const Ciphertext &encrypted) const
+        {
+            Ciphertext cpy = encrypted;
+            transform_to_positive_ntt_inplace(cpy);
+            return cpy;
+        }
+        /**
+         * Transform to NTT, but instead of using negacyclic-ntt, uses conventional NTT, with padding.
+         */
+        Plaintext transform_to_positive_ntt(const Plaintext &plain) const
+        {
+            Plaintext cpy = plain;
+            transform_to_positive_ntt_inplace(cpy);
+            return cpy;
+        }
+
+        /**
          * Moves the plaintext into coefficient mod domain.
          * Results in a plaintext with and increased size. matching the coeff_modulus size.
          */
@@ -1375,5 +1417,12 @@ namespace seal
         void multiply_plain_ntt(Ciphertext &encrypted_ntt, const Plaintext &plain_ntt) const;
 
         SEALContext context_;
+        void validate_plaintext_parameters(
+            const Plaintext &plain, const parms_id_type &parms_id, MemoryPoolHandle pool) const;
+        void verify_ciphertext_parameters(Ciphertext &encrypted) const;
+
+        void pad_polynomial(
+            std::uint64_t *src, std::uint64_t *dst, size_t coeff_count, size_t coeff_modulus_size,
+            size_t padded_polys_coeff_count) const;
     };
 } // namespace seal

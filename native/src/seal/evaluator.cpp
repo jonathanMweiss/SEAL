@@ -2171,7 +2171,8 @@ namespace seal
         }
     }
 
-    void Evaluator::plain_to_coeff_space(Plaintext &plain, parms_id_type parms_id, MemoryPoolHandle pool) const
+    void Evaluator::validate_plaintext_parameters(
+        const Plaintext &plain, const parms_id_type &parms_id, MemoryPoolHandle pool) const
     {
         // Verify parameters.
         if (!is_valid_for(plain, context_))
@@ -2192,8 +2193,13 @@ namespace seal
         {
             throw invalid_argument("pool is uninitialized");
         }
+    }
 
+    void Evaluator::plain_to_coeff_space(Plaintext &plain, parms_id_type parms_id, MemoryPoolHandle pool) const
+    {
+        validate_plaintext_parameters(plain, parms_id, pool);
         // Extract encryption parameters.
+        auto context_data_ptr = context_.get_context_data(parms_id);
         auto &context_data = *context_data_ptr;
         auto &parms = context_data.parms();
         auto &coeff_modulus = parms.coeff_modulus();
@@ -2292,91 +2298,19 @@ namespace seal
 
     void Evaluator::transform_to_ntt_inplace(Plaintext &plain, parms_id_type parms_id, MemoryPoolHandle pool) const
     {
-        // Verify parameters.
-        if (!is_valid_for(plain, context_))
-        {
-            throw invalid_argument("plain is not valid for encryption parameters");
-        }
-
-        auto context_data_ptr = context_.get_context_data(parms_id);
-        if (!context_data_ptr)
-        {
-            throw invalid_argument("parms_id is not valid for the current context");
-        }
-        if (plain.is_ntt_form())
-        {
-            throw invalid_argument("plain is already in NTT form");
-        }
-        if (!pool)
-        {
-            throw invalid_argument("pool is uninitialized");
-        }
+        validate_plaintext_parameters(plain, parms_id, pool);
 
         // Extract encryption parameters.
+        auto context_data_ptr = context_.get_context_data(parms_id);
         auto &context_data = *context_data_ptr;
         auto &parms = context_data.parms();
-        auto &coeff_modulus = parms.coeff_modulus();
         size_t coeff_count = parms.poly_modulus_degree();
-        size_t coeff_modulus_size = coeff_modulus.size();
-        size_t plain_coeff_count = plain.coeff_count();
-
-        uint64_t plain_upper_half_threshold = context_data.plain_upper_half_threshold();
-        auto plain_upper_half_increment = context_data.plain_upper_half_increment();
+        size_t coeff_modulus_size = parms.coeff_modulus().size();
 
         auto ntt_tables = iter(context_data.small_ntt_tables());
+        plain_to_coeff_space(plain, parms_id, pool);
 
-        // Size check
-        if (!product_fits_in(coeff_count, coeff_modulus_size))
-        {
-            throw logic_error("invalid parameters");
-        }
-
-        // Resize to fit the entire NTT transformed (ciphertext size) polynomial
-        // Note that the new coefficients are automatically set to 0
-        plain.resize(coeff_count * coeff_modulus_size);
         RNSIter plain_iter(plain.data(), coeff_count);
-
-        if (!context_data.qualifiers().using_fast_plain_lift)
-        {
-            // Allocate temporary space for an entire RNS polynomial
-            // Slight semantic misuse of RNSIter here, but this works well
-            SEAL_ALLOCATE_ZERO_GET_RNS_ITER(temp, coeff_modulus_size, coeff_count, pool);
-
-            SEAL_ITERATE(iter(plain.data(), temp), plain_coeff_count, [&](auto I) {
-                auto plain_value = get<0>(I);
-                if (plain_value >= plain_upper_half_threshold)
-                {
-                    add_uint(plain_upper_half_increment, coeff_modulus_size, plain_value, get<1>(I));
-                }
-                else
-                {
-                    *get<1>(I) = plain_value;
-                }
-            });
-
-            context_data.rns_tool()->base_q()->decompose_array(temp, coeff_count, pool);
-
-            // Copy data back to plain
-            set_poly(temp, coeff_count, coeff_modulus_size, plain.data());
-        }
-        else
-        {
-            // Note that in this case plain_upper_half_increment holds its value in RNS form modulo the coeff_modulus
-            // primes.
-
-            // Create a "reversed" helper iterator that iterates in the reverse order both plain RNS components and
-            // the plain_upper_half_increment values.
-            auto helper_iter = reverse_iter(plain_iter, plain_upper_half_increment);
-            advance(helper_iter, -safe_cast<ptrdiff_t>(coeff_modulus_size - 1));
-
-            SEAL_ITERATE(helper_iter, coeff_modulus_size, [&](auto I) {
-                SEAL_ITERATE(iter(*plain_iter, get<0>(I)), plain_coeff_count, [&](auto J) {
-                    get<1>(J) =
-                        SEAL_COND_SELECT(get<0>(J) >= plain_upper_half_threshold, get<0>(J) + get<1>(I), get<0>(J));
-                });
-            });
-        }
-
         // Transform to NTT domain
         ntt_negacyclic_harvey(plain_iter, coeff_modulus_size, ntt_tables);
 
@@ -2385,23 +2319,11 @@ namespace seal
 
     void Evaluator::transform_to_ntt_inplace(Ciphertext &encrypted) const
     {
-        // Verify parameters.
-        if (!is_metadata_valid_for(encrypted, context_) || !is_buffer_valid(encrypted))
-        {
-            throw invalid_argument("encrypted is not valid for encryption parameters");
-        }
-
-        auto context_data_ptr = context_.get_context_data(encrypted.parms_id());
-        if (!context_data_ptr)
-        {
-            throw invalid_argument("encrypted is not valid for encryption parameters");
-        }
-        if (encrypted.is_ntt_form())
-        {
-            throw invalid_argument("encrypted is already in NTT form");
-        }
+        verify_ciphertext_parameters(encrypted);
 
         // Extract encryption parameters.
+        auto context_data_ptr = context_.get_context_data(encrypted.parms_id());
+
         auto &context_data = *context_data_ptr;
         auto &parms = context_data.parms();
         auto &coeff_modulus = parms.coeff_modulus();
@@ -2936,5 +2858,371 @@ namespace seal
                 });
             }
         });
+    }
+
+    void Evaluator::transform_to_positive_ntt_inplace(Plaintext &plain) const
+    {
+        plain_to_coeff_space(plain, context_.first_parms_id());
+        zero_pad(plain, context_.first_parms_id());
+
+        auto &c_data = *context_.get_context_data(context_.positive_wrapped_parms_id());
+
+        auto ntt_tables = iter(c_data.small_ntt_tables());
+
+        RNSIter plain_iter(plain.data(), c_data.parms().poly_modulus_degree());
+        // Transform to NTT domain
+        ntt_negacyclic_harvey(plain_iter, c_data.parms().coeff_modulus().size(), ntt_tables);
+
+        plain.parms_id() = context_.positive_wrapped_parms_id();
+    }
+
+    void Evaluator::transform_to_positive_ntt_inplace(Ciphertext &encrypted) const
+    {
+        verify_ciphertext_parameters(encrypted);
+        if (encrypted.parms_id() != context_.first_parms_id())
+        {
+            throw invalid_argument("supporting postive wrapped nnt params only for first params.");
+        }
+
+        // Extract encryption parameters.
+        auto context_data_ptr = context_.get_context_data(context_.positive_wrapped_parms_id());
+        auto &context_data = *context_data_ptr;
+        auto &parms = context_data.parms();
+        auto &coeff_modulus = parms.coeff_modulus();
+        size_t coeff_count = parms.poly_modulus_degree();
+        size_t coeff_modulus_size = coeff_modulus.size();
+        size_t encrypted_size = encrypted.size();
+
+        auto ntt_tables = iter(context_data.small_ntt_tables());
+
+        // TODO: zero pad the encrypted.
+        zero_pad(encrypted);
+        // Size check
+        if (!product_fits_in(coeff_count, coeff_modulus_size))
+        {
+            throw logic_error("invalid parameters");
+        }
+
+        // Transform each polynomial to NTT domain
+        ntt_negacyclic_harvey(encrypted, encrypted_size, ntt_tables);
+
+        // Finally change the is_ntt_transformed flag
+        encrypted.is_ntt_form() = true;
+        encrypted.parms_id() = context_.positive_wrapped_parms_id();
+    }
+    void Evaluator::verify_ciphertext_parameters(Ciphertext &encrypted) const
+    { // Verify parameters.
+        if (!is_metadata_valid_for(encrypted, context_) || !is_buffer_valid(encrypted))
+        {
+            throw invalid_argument("encrypted is not valid for encryption parameters");
+        }
+
+        auto context_data_ptr = context_.get_context_data(encrypted.parms_id());
+        if (!context_data_ptr)
+        {
+            throw invalid_argument("encrypted is not valid for encryption parameters");
+        }
+        if (encrypted.is_ntt_form())
+        {
+            throw invalid_argument("encrypted is already in NTT form");
+        }
+    }
+
+    // helper function.
+    template <typename T>
+    seal::util::ReverseIter<T> reverse_from_pos(T iter, size_t pos)
+    {
+        std::advance(iter, pos);
+        return seal::util::ReverseIter<T>(iter);
+    }
+
+    // TODO: add doc:
+    void Evaluator::pad_polynomial(
+        std::uint64_t *src, std::uint64_t *dst, size_t coeff_count, size_t coeff_modulus_size,
+        size_t padded_polys_coeff_count) const
+    {
+        ReverseIter<RNSIter> reg_poly_iter =
+            reverse_from_pos(seal::util::RNSIter(src, coeff_count), coeff_modulus_size);
+
+        ReverseIter<RNSIter> padded_poly_iter =
+            reverse_from_pos(seal::util::RNSIter(dst, padded_polys_coeff_count), coeff_modulus_size);
+
+        SEAL_ITERATE(
+            seal::util::iter(reg_poly_iter, padded_poly_iter), coeff_modulus_size,
+            [&](tuple<PtrIter<uint64_t *>, PtrIter<uint64_t *>> I) {
+                std::uint64_t *s_ptr = std::get<0>(I).ptr();
+                std::uint64_t *d_ptr = std::get<1>(I).ptr();
+
+                //                memcpy(d_ptr, s_ptr, coeff_count);
+                //                memset(s_ptr, 0, coeff_count);
+                for (std::uint64_t i = 0; i < coeff_count; ++i)
+                {
+                    *d_ptr = *s_ptr;
+                    *s_ptr = 0;
+                    ++d_ptr;
+                    ++s_ptr;
+                }
+                // TODO: using memcpy causes a bug. maybe ask yossi.
+                //            memcpy(d_ptr, s_ptr, coeff_count);
+                //            memset(s_ptr, 0, coeff_count);
+            });
+    }
+
+    void Evaluator::zero_pad(Plaintext &plain, const parms_id_type &parms_id) const
+    {
+        if (parms_id != context_.first_parms_id())
+        {
+            throw invalid_argument("not supporting multiple parms_id for postivie_wrapped convolution.");
+        }
+
+        auto &context_data = *context_.get_context_data(parms_id);
+        auto &parms = context_data.parms();
+        auto &coeff_modulus = parms.coeff_modulus();
+        size_t reg_coeff_count = parms.poly_modulus_degree();
+        size_t coeff_modulus_size = coeff_modulus.size();
+
+        size_t padded_polys_coeff_count =
+            context_.get_context_data(context_.positive_wrapped_parms_id())->parms().poly_modulus_degree();
+        // resize sets everything with zeros.
+        seal::Plaintext res;
+        res.resize(padded_polys_coeff_count * coeff_modulus_size);
+
+        seal::util::RNSIter reg_poly_iter(plain.data(), reg_coeff_count);
+        seal::util::RNSIter padded_poly_iter(res.data(), padded_polys_coeff_count);
+
+        SEAL_ITERATE(
+            seal::util::iter(reg_poly_iter, padded_poly_iter), coeff_modulus_size,
+            [&](tuple<PtrIter<uint64_t *>, PtrIter<uint64_t *>> I) {
+                std::uint64_t *s_ptr = std::get<0>(I).ptr();
+                std::uint64_t *d_ptr = std::get<1>(I).ptr();
+
+//                memcpy(d_ptr, s_ptr, reg_coeff_count);
+//                memset(s_ptr, 0, reg_coeff_count);
+                for (std::uint64_t i = 0; i < reg_coeff_count; ++i)
+                {
+                    *d_ptr = *s_ptr;
+                    ++d_ptr;
+                    ++s_ptr;
+                }
+            });
+        plain = std::move(res);
+        return;
+    }
+
+    void Evaluator::zero_pad(Ciphertext &encrypted) const
+    {
+        if (encrypted.parms_id() != context_.first_parms_id())
+        {
+            throw invalid_argument("not supporting multiple parms_id for postivie_wrapped convolution.");
+        }
+        if (encrypted.is_ntt_form())
+        {
+            throw invalid_argument("can't pad ciphertex in ntt form.");
+        }
+        auto &first_ctx = *context_.get_context_data(context_.first_parms_id());
+
+        auto postive_wrapped_parms_id = context_.positive_wrapped_parms_id();
+
+        // allocates at the end of the encrypted enough space to hold all the polynomials.
+        seal::Ciphertext cpy;
+        cpy.resize(context_, postive_wrapped_parms_id, encrypted.size());
+
+        auto &ctx_data = *context_.get_context_data(postive_wrapped_parms_id);
+        auto &parms = ctx_data.parms();
+        auto &coeff_modulus = parms.coeff_modulus();
+        size_t padded_coeff_count = parms.poly_modulus_degree();
+        size_t coeff_modulus_size = coeff_modulus.size();
+
+        // iterators to iterate in reverse.
+        auto reg_itr = seal::util::ConstPolyIter(encrypted);
+        auto padded_itr = seal::util::PolyIter(cpy);
+
+        seal::util::RNSIter pp(encrypted.data(), padded_coeff_count);
+        SEAL_ITERATE(seal::util::iter(reg_itr, padded_itr), encrypted.size(), [&](tuple<ConstRNSIter, RNSIter> I) {
+            // now need to write a single polynomial to the new padded location.
+            SEAL_ITERATE(seal::util::iter(std::get<0>(I), std::get<1>(I)), coeff_modulus_size, [&](auto coefItrs) {
+                const std::uint64_t *s_ptr(std::get<0>(coefItrs));
+                std::uint64_t *d_ptr(std::get<1>(coefItrs));
+                for (std::uint64_t i = 0; i < first_ctx.parms().poly_modulus_degree(); i++)
+                {
+                    *d_ptr = *s_ptr;
+                    ++d_ptr;
+                    ++s_ptr;
+                }
+            });
+        });
+        encrypted = std::move(cpy);
+    }
+
+    vector<uint64_t> fillVectorFromPointers(std::uint64_t *start, std::uint64_t *end)
+    {
+        end++; // to include the last element.
+        std::vector<std::uint64_t> vec;
+        vec.clear(); // Clear the vector before filling it
+        while (start != end)
+        {
+            vec.push_back(*start);
+            ++start;
+        }
+        return vec;
+    }
+
+    /**
+     *
+     * @param poly_begin
+     * @param poly_end
+     * @param poly_degree the actual expected degree of the polynomial, for instance it should be mod X^8192+1, than
+     * the poly_degree should be 8192.
+     * @param mod
+     */
+    void apply_mod(
+        std::uint64_t *poly_begin, std::uint64_t *poly_end, std::uint64_t poly_degree, const seal::Modulus &mod)
+    {
+        std::uint64_t *poly_runner = poly_end - poly_degree;
+        while (poly_runner >= poly_begin) // including the first coefficient
+        {
+            *poly_runner = seal::util::sub_uint_mod(*poly_runner, *poly_end, mod);
+            poly_runner--;
+            //            *poly_end = 0;
+            poly_end--;
+        }
+    }
+
+    // assuming polynomial is in padded form.
+    void Evaluator::polynomial_mod(Plaintext &ptx) const
+    {
+        if (ptx.is_ntt_form())
+        {
+            throw invalid_argument("can't apply poly mod to plaintext in NTT form");
+        }
+
+        auto &context_data = *context_.get_context_data(context_.positive_wrapped_parms_id());
+        auto &parms = context_data.parms();
+        auto &coeff_modulus = parms.coeff_modulus();
+        size_t padded_coeff_count = parms.poly_modulus_degree();
+
+        auto &frst_params = context_.first_context_data()->parms();
+        auto reg_coeff_count = frst_params.poly_modulus_degree();
+
+        size_t mod_index = 0;
+        SEAL_ITERATE(RNSIter(ptx.data(), padded_coeff_count), coeff_modulus.size(), [&](auto J) {
+            // J = begin, J+ padded_coeff_count-1 = end, J+ padded_coeff_count is the next rns poly.
+            apply_mod(J, J + (padded_coeff_count)-1, reg_coeff_count, coeff_modulus[mod_index++]);
+        });
+
+        seal::util::RNSIter reg_itr(ptx.data(), frst_params.poly_modulus_degree());
+        seal::util::RNSIter pad_itr(ptx.data(), padded_coeff_count);
+        // no need to move the first polynomial
+        std::advance(reg_itr, 1);
+        std::advance(pad_itr, 1);
+        // no need to move the first polynomial since it sits in its correct place.
+        SEAL_ITERATE(seal::util::iter(reg_itr, pad_itr), coeff_modulus.size() - 1, [&](auto I) {
+            std::uint64_t *s_ptr(std::get<1>(I));
+            std::uint64_t *d_ptr(std::get<0>(I));
+
+            // cpy the polynomial to the new location.
+            for (std::uint64_t i = 0; i < reg_coeff_count; ++i)
+            {
+                *d_ptr = *s_ptr;
+                ++d_ptr;
+                ++s_ptr;
+            }
+        });
+
+        ptx.resize(reg_coeff_count * coeff_modulus.size());
+        ptx.parms_id() = context_.first_parms_id();
+    }
+
+    void Evaluator::polynomial_mod(Ciphertext &encrypted) const
+    {
+        if (encrypted.is_ntt_form())
+        {
+            throw invalid_argument("can't apply poly mod to ciphertext in NTT form");
+        }
+
+        if (encrypted.parms_id() != context_.positive_wrapped_parms_id())
+        {
+            throw invalid_argument("not supporting multiple parms_id for postivie_wrapped convolution.");
+        }
+
+        auto &context_data = *context_.get_context_data(encrypted.parms_id());
+        auto &parms = context_data.parms();
+        auto &coeff_modulus = parms.coeff_modulus();
+        size_t padded_coeff_count = parms.poly_modulus_degree();
+
+        auto &frst_params = context_.first_context_data()->parms();
+        size_t reg_coeff_count = frst_params.poly_modulus_degree();
+
+        SEAL_ITERATE(seal::util::PolyIter(encrypted), encrypted.size(), [&](seal::util::RNSIter I) {
+            size_t mod_index = 0;
+            SEAL_ITERATE(I, coeff_modulus.size(), [&](auto J) {
+                apply_mod(J, J + (padded_coeff_count)-1, reg_coeff_count, coeff_modulus[mod_index++]);
+            });
+        });
+
+        // now dePAD the polynomial
+        seal::util::PolyIter reg_itr(encrypted.data(), frst_params.poly_modulus_degree(), coeff_modulus.size());
+        seal::util::PolyIter pad_itr(encrypted.data(), padded_coeff_count, coeff_modulus.size());
+        SEAL_ITERATE(
+            seal::util::iter(reg_itr, pad_itr), encrypted.size(),
+            [&](std::tuple<seal::util::RNSIter, seal::util::RNSIter> I) {
+                auto reg_rns = std::get<0>(I);
+                auto pad_rns = std::get<1>(I);
+
+                //        // no need to move the first polynomial since it sits in its correct place.
+                SEAL_ITERATE(seal::util::iter(reg_rns, pad_rns), coeff_modulus.size(), [&](auto J) {
+                    std::uint64_t *s_ptr(std::get<1>(J));
+                    std::uint64_t *d_ptr(std::get<0>(J));
+                    //
+                    //            // cpy the polynomial to the new location.
+                    for (std::uint64_t i = 0; i < reg_coeff_count; ++i)
+                    {
+                        *d_ptr = *s_ptr;
+                        ++d_ptr;
+                        ++s_ptr;
+                    }
+                });
+            });
+
+        encrypted.resize(context_, context_.first_parms_id(), encrypted.size());
+        encrypted.parms_id() = context_.first_parms_id();
+    }
+    void Evaluator::transform_from_positive_ntt_inplace(Ciphertext &encrypted_ntt) const
+    {
+        if (!is_metadata_valid_for(encrypted_ntt, context_) || !is_buffer_valid(encrypted_ntt))
+        {
+            throw invalid_argument("encrypted is not valid for encryption parameters");
+        }
+        if (encrypted_ntt.parms_id() != context_.positive_wrapped_parms_id())
+        {
+            throw invalid_argument("encrypted_ntt is not in positive NTT form");
+        }
+
+        auto context_data_ptr = context_.get_context_data(encrypted_ntt.parms_id());
+        if (!context_data_ptr)
+        {
+            throw invalid_argument("encrypted_ntt is not valid for encryption parameters");
+        }
+
+        // Extract encryption parameters.
+        auto &context_data = *context_data_ptr;
+        auto &parms = context_data.parms();
+        size_t coeff_count = parms.poly_modulus_degree();
+        size_t coeff_modulus_size = parms.coeff_modulus().size();
+        size_t encrypted_ntt_size = encrypted_ntt.size();
+
+        auto ntt_tables = iter(context_data.small_ntt_tables());
+
+        // Size check
+        if (!product_fits_in(coeff_count, coeff_modulus_size))
+        {
+            throw logic_error("invalid parameters");
+        }
+
+        // Transform each polynomial from NTT domain
+        inverse_ntt_negacyclic_harvey(encrypted_ntt, encrypted_ntt_size, ntt_tables);
+
+        // Finally change the is_ntt_transformed flag
+        encrypted_ntt.is_ntt_form() = false;
     }
 } // namespace seal

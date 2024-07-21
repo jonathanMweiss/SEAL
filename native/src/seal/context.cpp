@@ -452,7 +452,8 @@ namespace seal
     }
 
     SEALContext::SEALContext(
-        EncryptionParameters parms, bool expand_mod_chain, sec_level_type sec_level, MemoryPoolHandle pool)
+        EncryptionParameters parms, bool expand_mod_chain, sec_level_type sec_level, MemoryPoolHandle pool,
+        int positive_ntt_max_multiplications)
         : pool_(move(pool)), sec_level_(sec_level)
     {
         if (!pool_)
@@ -519,5 +520,25 @@ namespace seal
             const_pointer_cast<ContextData>(context_data_ptr)->chain_index_ = --parms_count;
             context_data_ptr = context_data_ptr->next_context_data_;
         }
+
+        if (positive_ntt_max_multiplications >= 0)
+        {
+            create_positive_ntt_tables(positive_ntt_max_multiplications);
+        }
+    }
+
+    void SEALContext::create_positive_ntt_tables(int multiplications)
+    {
+        auto &frst_ctx = *context_data_map_.at(first_parms_id_);
+        EncryptionParameters positive_wrapped_ntt_parameters(frst_ctx.parms_);
+        positive_wrapped_ntt_parameters.set_poly_modulus_degree(
+            seal::util::exponentiate_uint(2, static_cast<uint64_t>(multiplications)) *
+            frst_ctx.parms_.poly_modulus_degree());
+
+        auto context_data = validate(positive_wrapped_ntt_parameters);
+
+        positive_wrapped_ntt_parms_id_ = positive_wrapped_ntt_parameters.parms_id();
+        context_data_map_.emplace(make_pair(
+            positive_wrapped_ntt_parameters.parms_id(), make_shared<const ContextData>(std::move(context_data))));
     }
 } // namespace seal

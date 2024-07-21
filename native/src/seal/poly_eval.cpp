@@ -4,39 +4,6 @@
 namespace seal::fractures
 {
 
-    /**
-     * methodology taken from evaluator.cpp
-     * Main idea is to move the plaintext from a single modulus representation to the same RNS representation as
-     * used in firstContextData (freshly minted ctx).
-     * @param plain that needed to be changed.
-     */
-    void ramp_up_polynomial(seal::Plaintext &plain, const seal::SEALContext &ctx)
-    {
-        auto &context_data = *ctx.first_context_data();
-        auto &parms = context_data.parms();
-        auto &coeff_modulus = parms.coeff_modulus();
-        size_t coeff_count = parms.poly_modulus_degree();
-        size_t coeff_modulus_size = coeff_modulus.size();
-        size_t plain_coeff_count = plain.coeff_count();
-
-        uint64_t plain_upper_half_threshold = context_data.plain_upper_half_threshold();
-        auto plain_upper_half_increment = context_data.plain_upper_half_increment();
-
-        plain.resize(coeff_count * coeff_modulus_size);
-        seal::util::RNSIter plain_iter(plain.data(), coeff_count);
-
-        auto helper_iter = reverse_iter(plain_iter, plain_upper_half_increment);
-        std::advance(helper_iter, -seal::util::safe_cast<ptrdiff_t>(coeff_modulus_size - 1));
-
-        // ramp up the polynomial to rns.
-        SEAL_ITERATE(helper_iter, coeff_modulus_size, [&](auto I) {
-            SEAL_ITERATE(iter(*plain_iter, std::get<0>(I)), plain_coeff_count, [&](auto J) {
-                std::get<1>(J) = SEAL_COND_SELECT(
-                    std::get<0>(J) >= plain_upper_half_threshold, std::get<0>(J) + std::get<1>(I), std::get<0>(J));
-            });
-        });
-    }
-
     EvaluatedPoint seal::fractures::PolynomialEvaluator::evaluate(
         seal::Plaintext &p, const std::vector<std::uint64_t> &value) const
     {
@@ -54,11 +21,12 @@ namespace seal::fractures
                 "haven't implemented polynomial evaluation without 'using_fast_plain_lift' set to true!.");
         }
 
-        ramp_up_polynomial(p, context);
+        ev.plain_to_coeff_space(p, context.first_parms_id());
 
         auto &parms = ctx_data->parms();
         return evaluate_singe_RNS_polynomial(
-            seal::util::ConstRNSIter(p.data(), parms.poly_modulus_degree()), parms.coeff_modulus(), value);
+            seal::util::ConstRNSIter(p.data(), parms.poly_modulus_degree()), parms.coeff_modulus(), value,
+            context.first_parms_id());
     }
 
     EvaluatedCipherPoint PolynomialEvaluator::evaluate(
@@ -80,7 +48,7 @@ namespace seal::fractures
 
         std::uint64_t i = 0;
         SEAL_ITERATE(seal::util::ConstPolyIter(ctx), ctx.size(), [&](seal::util::ConstRNSIter iter) {
-            result.poly_fracs[i] = evaluate_singe_RNS_polynomial(iter, coeff_modulus, value);
+            result.poly_fracs[i] = evaluate_singe_RNS_polynomial(iter, coeff_modulus, value, ctx.parms_id());
             i++;
         });
 
@@ -103,10 +71,11 @@ namespace seal::fractures
     }
 
     EvaluatedPoint PolynomialEvaluator::evaluate_singe_RNS_polynomial(
-        seal::util::ConstRNSIter rns_iter, const std::vector<seal::Modulus> &modulus,
-        const std::vector<std::uint64_t> &value) const
+        util::ConstRNSIter rns_iter, const std::vector<seal::Modulus> &modulus, const std::vector<std::uint64_t> &value,
+        const parms_id_type p_id) const
     {
-        auto poly_degree = context.first_context_data()->parms().poly_modulus_degree();
+        // TODO: must use relevant context, for instance - padded ctx have different contexr!
+        auto poly_degree = context.get_context_data(p_id)->parms().poly_modulus_degree();
         std::vector<std::uint64_t> result_vec(modulus.size());
 
         uint64_t i = 0;
@@ -198,6 +167,7 @@ namespace seal::fractures
         // as a result, $a^k\ne 1$ for all $k < q-1$. otherwise there is a cycle that doesn't go through every
         // element other than 0 in the field, in contradiction to $a$ being a generator/ primitive element.
         // Thus, $w=a^(q-1)/n$ is an n-th root of unity, because w^n = a^(q-1) = 1 and w^k != 1 for all k < n.
+        return a;
         return seal::util::exponentiate_uint_mod(a, (m.value() - 1 / n), m);
     }
 } // namespace seal::fractures

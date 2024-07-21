@@ -492,8 +492,9 @@ namespace seal
         */
         SEALContext(
             const EncryptionParameters &parms, bool expand_mod_chain = true,
-            sec_level_type sec_level = sec_level_type::tc128)
-            : SEALContext(parms, expand_mod_chain, sec_level, MemoryManager::GetPool())
+            sec_level_type sec_level = sec_level_type::tc128, int positive_ntt_max_multiplications = 0)
+            : SEALContext(
+                  parms, expand_mod_chain, sec_level, MemoryManager::GetPool(), positive_ntt_max_multiplications)
         {}
 
         /**
@@ -610,6 +611,10 @@ namespace seal
         {
             return first_parms_id_;
         }
+        SEAL_NODISCARD inline const parms_id_type &positive_wrapped_parms_id() const noexcept
+        {
+            return positive_wrapped_ntt_parms_id_;
+        }
 
         /**
         Returns a parms_id_type corresponding to the last encryption parameters
@@ -645,9 +650,11 @@ namespace seal
         @param[in] pool The MemoryPoolHandle pointing to a valid memory pool
         @throws std::invalid_argument if pool is uninitialized
         */
-        SEALContext(EncryptionParameters parms, bool expand_mod_chain, sec_level_type sec_level, MemoryPoolHandle pool);
+        SEALContext(
+            EncryptionParameters parms, bool expand_mod_chain, sec_level_type sec_level, MemoryPoolHandle pool,
+            int positive_ntt_max_multiplications = 0);
 
-        ContextData validate(EncryptionParameters parms);
+        SEALContext::ContextData validate(EncryptionParameters parms);
 
         /**
         Create the next context_data by dropping the last element from coeff_modulus.
@@ -665,6 +672,8 @@ namespace seal
 
         parms_id_type last_parms_id_;
 
+        parms_id_type positive_wrapped_ntt_parms_id_;
+
         std::unordered_map<parms_id_type, std::shared_ptr<const ContextData>> context_data_map_{};
 
         /**
@@ -676,5 +685,6 @@ namespace seal
         Is keyswitching supported by the encryption parameters?
         */
         bool using_keyswitching_;
+        void create_positive_ntt_tables(int multiplications);
     };
 } // namespace seal

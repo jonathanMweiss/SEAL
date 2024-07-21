@@ -9,6 +9,7 @@
 #include "seal/matmul.hpp"
 #include "seal/modulus.h"
 #include "seal/poly_eval.h"
+#include "helpers.h"
 #include <cstddef>
 #include <cstdint>
 #include <ctime>
@@ -21,109 +22,6 @@ using namespace seal;
 using namespace std;
 namespace sealtest
 {
-    struct SetupObjs
-    {
-        seal::EncryptionParameters enc_params;
-        seal::SEALContext context;
-        seal::Evaluator evaluator;
-        seal::KeyGenerator keygen;
-        seal::SecretKey secret_key;
-        seal::Encryptor encryptor;
-        seal::Decryptor decryptor;
-
-        /**
-         * The following parameters are chosen to support ctx-ctx multiplication and still have budget left.
-         * @param N
-         * @param logt
-         * @return
-         */
-        static SetupObjs New(std::uint64_t N = 4096 * 2, int logt = 16)
-        {
-            seal::EncryptionParameters enc(seal::scheme_type::bgv);
-
-            enc.set_poly_modulus_degree(N);
-            //            enc.set_coeff_modulus(seal::CoeffModulus::BFVDefault(N, sec_level_type::tc192));
-
-            auto tmp = std::vector<int>{ 54, 41, 42 };
-            auto o = seal::CoeffModulus::Create(N, tmp);
-            enc.set_coeff_modulus(o);
-            enc.set_plain_modulus(seal::PlainModulus::Batching(N, logt + 1));
-            // 218 is 128-bit secure.
-            // 152 is 192-bit secure.
-            //            auto tmp = std::vector<int>{ 54, 50,40};
-            //            auto tmp = std::vector<int>{ 54, 41, 42 };
-            //            auto o = seal::CoeffModulus::Create(N, tmp);
-            //            enc.set_coeff_modulus(o);
-            //            enc.set_plain_modulus(seal::PlainModulus::Batching(N, logt + 1));
-
-            return SetupObjs(enc);
-        }
-
-        explicit SetupObjs(seal::EncryptionParameters encryption_params)
-            : enc_params(std::move(encryption_params)), context(enc_params, true), evaluator(context), keygen(context),
-              secret_key(keygen.secret_key()), encryptor(context, secret_key), decryptor(context, secret_key){};
-
-        seal::Plaintext random_plaintext() const
-        {
-            seal::Plaintext p(enc_params.poly_modulus_degree());
-
-            // avoiding encoder usage - to prevent unwanted transformation to the ptx underlying elements
-            std::vector<std::uint64_t> v(enc_params.poly_modulus_degree(), 0);
-
-            shared_ptr<UniformRandomGenerator> gen = prng();
-
-            auto mod = enc_params.plain_modulus().value();
-            std::generate(v.begin(), v.end(), [gen = std::move(gen), &mod]() { return gen->generate() % mod; });
-
-            for (std::uint64_t i = 0; i < enc_params.poly_modulus_degree(); ++i)
-            {
-                p[i] = v[i];
-            }
-            return p;
-        }
-
-        shared_ptr<UniformRandomGenerator> prng() const
-        {
-            Blake2xbPRNGFactory factory;
-            array<uint64_t, prng_seed_uint64_count> seed{ 1, 2, 3, 4, 5, 6, 7, 8 };
-            auto gen = factory.create(seed);
-            return gen;
-        }
-
-        seal::Plaintext random_ntt_plaintext() const
-        {
-            auto p = random_plaintext();
-            auto pid = context.first_parms_id();
-
-            evaluator.plain_to_coeff_space(p, pid);
-            evaluator.transform_plain_in_coeff_space_to_ntt_inplace(p, pid);
-
-            return p;
-        }
-
-        seal::Ciphertext random_ciphertext() const
-        {
-            auto ptx = random_plaintext();
-            seal::Ciphertext ctx;
-            encryptor.encrypt_symmetric(ptx, ctx);
-            if (ctx.is_ntt_form())
-            {
-                return ctx;
-            }
-
-            evaluator.transform_to_ntt_inplace(ctx);
-            return ctx;
-        }
-
-        seal::Ciphertext random_nontt_ciphertext()
-        {
-            auto ptx = random_plaintext();
-            seal::Ciphertext ctx;
-            encryptor.encrypt_symmetric(ptx, ctx);
-            evaluator.transform_from_ntt_inplace(ctx);
-            return ctx;
-        }
-    };
 
     std::vector<seal::Ciphertext> random_ctx_vector(const SetupObjs &all, int size)
     {
@@ -134,12 +32,23 @@ namespace sealtest
         }
         return ctxs;
     }
-    std::vector<seal::Plaintext> random_ptxs(const SetupObjs &all, int size)
+
+    std::vector<seal::Plaintext> random_ntt_ptxs(const SetupObjs &all, int size)
     {
         std::vector<seal::Plaintext> ptxs;
         for (int i = 0; i < size; ++i)
         {
             ptxs.push_back(all.random_ntt_plaintext());
+        }
+        return ptxs;
+    }
+
+    std::vector<seal::Plaintext> random_ptxs(const SetupObjs &all, int size)
+    {
+        std::vector<seal::Plaintext> ptxs;
+        for (int i = 0; i < size; ++i)
+        {
+            ptxs.push_back(all.random_plaintext());
         }
         return ptxs;
     }
@@ -159,64 +68,6 @@ namespace sealtest
         {
             ctxshred1[i] += ctxshred2[i];
         }
-    }
-    template <typename U, typename V>
-    seal::Ciphertext mult_row(
-        const SetupObjs &all, uint64_t i, uint64_t j, const seal::util::matrix<U> &left,
-        const seal::util::matrix<V> &right)
-    {
-        seal::Ciphertext tmp;
-        seal::Ciphertext tmp_result(all.context);
-        tmp_result.is_ntt_form() = true;
-
-        // assume that in seal::Plaintext case we don't want to turn into splitPlaintexts
-        for (uint64_t k = 0; k < left.cols; ++k)
-        {
-            if constexpr ((std::is_same_v<V, seal::Plaintext>))
-            {
-                all.evaluator.multiply_plain(left(i, k), right(k, j), tmp);
-            }
-            else if constexpr (std::is_same_v<U, seal::Plaintext>)
-            {
-                all.evaluator.multiply_plain(right(k, j), left(i, k), tmp);
-            }
-            else
-            {
-                all.evaluator.multiply(left(i, k), right(k, j), tmp);
-            }
-            all.evaluator.add(tmp, tmp_result, tmp_result);
-        }
-        return tmp_result;
-    }
-
-    template <typename U, typename V>
-    void mat_mult(
-        const SetupObjs &all, const seal::util::matrix<U> &left, const seal::util::matrix<V> &right,
-        seal::util::matrix<seal::Ciphertext> &result)
-    {
-        for (uint64_t i = 0; i < left.rows; ++i)
-        {
-            for (uint64_t j = 0; j < right.cols; ++j)
-            {
-                result(i, j) = mult_row(all, i, j, left, right);
-            }
-        }
-    }
-
-    template <typename T, typename U>
-    seal::util::matrix<Ciphertext> multiplyMatrices(
-        SetupObjs &all, const seal::util::matrix<T> &a, const seal::util::matrix<U> &b)
-    {
-        if constexpr (std::is_same_v<T, seal::Plaintext> && std::is_same_v<U, seal::Plaintext>)
-        {
-            throw std::invalid_argument("MatrixOperations::multiply: cannot multiply plaintext by plaintext");
-        }
-        verify_correct_dimension(a, b);
-        verify_not_empty_matrices(a, b);
-
-        seal::util::matrix<Ciphertext> result(a.rows, b.cols);
-        mat_mult(all, a, b, result);
-        return result;
     }
 
     vector<util::matrix<fractures::CiphertextFracture>> fracture_matrix(
@@ -273,7 +124,6 @@ namespace sealtest
         return fractured_matrices;
     }
 
-
     std::string rns_number_to_string(const std::vector<std::uint64_t> &rns_number)
     {
         std::string s;
@@ -299,8 +149,7 @@ namespace sealtest
         std::uint64_t poly_number = 0;
         SEAL_ITERATE(seal::util::ConstPolyIter(ctx), ctx.size(), [&](seal::util::ConstRNSIter rns_iter_per_poly) {
             std::uint64_t rns_number = 0;
-            ss << "\""
-               << "poly" << poly_number++ << "\":{";
+            ss << "\"" << "poly" << poly_number++ << "\":{";
             SEAL_ITERATE(seal::util::iter(rns_iter_per_poly), modulus.size(), [&](auto coef_iter) {
                 ss << "\"" << modulus[rns_number++].value() << "\":[";
                 if (poly_number == 3)
@@ -332,25 +181,6 @@ namespace sealtest
         std::stringstream ss;
         ctx_to_json(ss, all, ctx);
         ctx_json_into_file(ss, filename);
-    }
-
-    // root of X^n+1 in RNS form. for specific ring of BGV used in all of these tests.
-    const std::vector<std::uint64_t> root{ 9354911369072846, 1245024710537 };
-
-    template <typename MatrixType, typename EvaluatedType>
-    util::matrix<EvaluatedType> evaluate_matrix(const SetupObjs &all, seal::util::matrix<MatrixType> &m)
-    {
-        std::vector<EvaluatedType> inner_vec;
-        seal::fractures::PolynomialEvaluator pe(all.context);
-
-        for (std::size_t i = 0; i < m.rows; ++i)
-        {
-            for (std::size_t j = 0; j < m.cols; ++j)
-            {
-                inner_vec.emplace_back(pe.evaluate(m(i, j), root));
-            }
-        }
-        return seal::util::matrix<EvaluatedType>(m.rows, m.cols, std::move(inner_vec));
     }
 
     bool random_ctx_ctx_sz(const SetupObjs &all, const vector<std::uint64_t> &r)
@@ -401,22 +231,130 @@ namespace sealtest
         return (ev_res == ev_mul);
     }
 
-    template <typename T>
-    void apply_on_each_element(seal::util::matrix<T> &m, std::function<void(T &)> f)
+    std::vector<std::uint64_t> dynarray_to_vector(const seal::DynArray<std::uint64_t> &dyn)
     {
-        for (auto &elem : m.data)
+        std::vector<std::uint64_t> v;
+        v.reserve(dyn.size()); // x4 is for ntt pad. x2 is for modulus size
+        for (std::uint64_t i = 0; i < dyn.size(); ++i)
         {
-            f(elem);
+            v.emplace_back(dyn.at(i));
         }
+        return v;
     }
 
-    template <typename T>
-    void apply_on_each_element(seal::util::matrix<T> &m, void (*f)(T &))
+    std::vector<std::uint64_t> plain_to_vector(const Plaintext &ptx)
     {
-        for (auto &elem : m.data)
-        {
-            f(elem);
-        }
+        return dynarray_to_vector(ptx.dyn_array());
     }
 
+    shared_ptr<UniformRandomGenerator> prng()
+    {
+        Blake2xbPRNGFactory factory;
+        array<uint64_t, prng_seed_uint64_count> seed{ 1, 2, 3, 4, 5, 6, 7, 8 };
+        auto gen = factory.create(seed);
+        return gen;
+    }
+
+    seal::Plaintext random_plain(const EncryptionParameters &enc_params)
+    {
+        seal::Plaintext p(enc_params.poly_modulus_degree());
+
+        // avoiding encoder usage - to prevent unwanted transformation to the ptx underlying elements
+        std::vector<std::uint64_t> v(enc_params.poly_modulus_degree(), 0);
+
+        shared_ptr<UniformRandomGenerator> gen = prng();
+
+        auto mod = enc_params.plain_modulus().value();
+        std::generate(v.begin(), v.end(), [gen = std::move(gen), &mod]() { return gen->generate() % mod; });
+
+        for (std::uint64_t i = 0; i < enc_params.poly_modulus_degree(); ++i)
+        {
+            p[i] = v[i];
+        }
+        return p;
+    }
+
+    std::uint64_t vector_gcd(std::vector<std::uint64_t> v)
+    {
+        std::uint64_t _gcd = std::gcd(v[0], v[1]);
+        for (std::uint64_t i = 2; i < v.size(); ++i)
+        {
+            _gcd = gcd(_gcd, v[i]);
+        }
+
+        return _gcd;
+    }
+
+    bool has_proper_roots(uint64_t wanted_ntt_deg, const vector<Modulus> &o)
+    {
+        vector<uint64_t> tmp;
+        // NTT L(n).
+        for (uint64_t l = 0; l < o.size(); ++l)
+        {
+            tmp.push_back((o[l].value() - 1));
+        }
+
+        // to get NTT to work (need to have roots of unity) we need the following to be true:
+        return 0 == (vector_gcd(tmp) % wanted_ntt_deg);
+    }
+
+    bool is_valid_ntt_params_for_deg(int i, int j, int k, std::uint64_t N, std::uint64_t wanted_ntt_deg)
+    {
+        if (i + j + k < 152)
+        {
+            return false;
+        }
+        auto o = seal::CoeffModulus::Create(N, std::vector<int>{ i, j, k });
+        return has_proper_roots(wanted_ntt_deg, o);
+    }
+
+    //        the following works i: 41 j: 57 k: 57
+    //        the following works i: 51 j: 57 k: 57
+    //        the following works i: 57 j: 41 k: 57
+    //        the following works i: 57 j: 51 k: 57
+    //        the following works i: 57 j: 57 k: 41
+    //        the following works i: 57 j: 57 k: 51
+    void find_possible_parameters()
+    {
+        std::uint64_t N = 8192;
+        seal::EncryptionParameters parms(seal::scheme_type::bgv);
+        parms.set_poly_modulus_degree(N);
+
+        parms.set_plain_modulus(seal::PlainModulus::Batching(N, 16 + 1));
+
+        for (int i = 41; i < 60; ++i)
+        {
+            for (int j = 41; j < 60; j++)
+            {
+                for (int k = 41; k < 60; k++)
+                {
+                    if (!is_valid_ntt_params_for_deg(i, j, k, N, 1 << 16))
+                    {
+                        continue;
+                    };
+                    auto tmp = std::vector<int>{ i, j, k };
+                    auto o = seal::CoeffModulus::Create(N, tmp);
+
+                    parms.set_coeff_modulus(o);
+                    auto cntx = SEALContext(parms, false, sec_level_type::tc128, 2);
+                    if (!cntx.parameters_set())
+                    {
+                        continue;
+                    }
+
+                    std::cout << "the following works i: " << i << " j: " << j << " k: " << k << std::endl;
+                }
+            }
+        }
+    }
+    void assert_eq_ciphers(const Ciphertext &e1, const Ciphertext &e2)
+    {
+        auto e1_vc = dynarray_to_vector(e1.dyn_array());
+        auto e2_vc = dynarray_to_vector(e2.dyn_array());
+        ASSERT_EQ(e1_vc.size(), e2_vc.size());
+        for (std::uint64_t i = 0; i < e1_vc.size(); ++i)
+        {
+            ASSERT_EQ(e1_vc[i], e2_vc[i]);
+        }
+    }
 } // namespace sealtest
