@@ -710,6 +710,6 @@ namespace sealtest
         all.evaluator.polynomial_mod(res2);
 
         assert_eq_ciphers(res1, res2);
-        ASSERT_TRUE((((ptx_ev * ctx_ev)*ctx_ev) == res_ev));
+        ASSERT_TRUE((((ptx_ev * ctx_ev) * ctx_ev) == res_ev));
     }
 } // namespace sealtest

@@ -57,8 +57,8 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/fractures.h
         ${CMAKE_CURRENT_LIST_DIR}/fractured_ciphertext.h
         ${CMAKE_CURRENT_LIST_DIR}/fractured_polynomial.h
-        ${CMAKE_CURRENT_LIST_DIR}/fractured_rns.h
-        ${CMAKE_CURRENT_LIST_DIR}/fractured_rns.h
+#        ${CMAKE_CURRENT_LIST_DIR}/fractured_rns.h
+#        ${CMAKE_CURRENT_LIST_DIR}/fractured_rns.h
         ${CMAKE_CURRENT_LIST_DIR}/fractured_polynomial.h
         ${CMAKE_CURRENT_LIST_DIR}/fractured_ciphertext.h
         ${CMAKE_CURRENT_LIST_DIR}/poly_eval.h
