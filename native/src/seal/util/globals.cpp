@@ -4,23 +4,21 @@
 #include "seal/modulus.h"
 #include "seal/util/globals.h"
 
-using namespace std;
-
 namespace seal
 {
     namespace util
     {
         namespace global_variables
         {
-            shared_ptr<MemoryPool> const global_memory_pool{ make_shared<MemoryPoolMT>() };
+            std::shared_ptr<MemoryPool> const global_memory_pool{ std::make_shared<MemoryPoolMT>() };
 #ifndef _M_CEE
-            thread_local shared_ptr<MemoryPool> const tls_memory_pool{ make_shared<MemoryPoolST>() };
+            thread_local std::shared_ptr<MemoryPool> const tls_memory_pool{ std::make_shared<MemoryPoolST>() };
 #else
 #pragma message("WARNING: Thread-local memory pools disabled to support /clr")
 #endif
-            const map<size_t, vector<Modulus>> &GetDefaultCoeffModulus128()
+            const std::map<size_t, std::vector<Modulus>> &GetDefaultCoeffModulus128()
             {
-                static const map<size_t, vector<Modulus>> default_coeff_modulus_128{
+                static const std::map<size_t, std::vector<Modulus>> default_coeff_modulus_128{
                     /*
                     Polynomial modulus: 1x^1024 + 1
                     Modulus count: 1
@@ -73,9 +71,9 @@ namespace seal
                 return default_coeff_modulus_128;
             }
 
-            const map<size_t, vector<Modulus>> &GetDefaultCoeffModulus192()
+            const std::map<size_t, std::vector<Modulus>> &GetDefaultCoeffModulus192()
             {
-                static const map<size_t, vector<Modulus>> default_coeff_modulus_192{
+                static const std::map<size_t, std::vector<Modulus>> default_coeff_modulus_192{
                     /*
                     Polynomial modulus: 1x^1024 + 1
                     Modulus count: 1
@@ -127,9 +125,9 @@ namespace seal
                 return default_coeff_modulus_192;
             }
 
-            const map<size_t, vector<Modulus>> &GetDefaultCoeffModulus256()
+            const std::map<size_t, std::vector<Modulus>> &GetDefaultCoeffModulus256()
             {
-                static const map<size_t, vector<Modulus>> default_coeff_modulus_256{
+                static const std::map<size_t, std::vector<Modulus>> default_coeff_modulus_256{
                     /*
                     Polynomial modulus: 1x^1024 + 1
                     Modulus count: 1
