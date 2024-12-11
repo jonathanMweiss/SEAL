@@ -12,6 +12,7 @@ namespace seal
         {
             std::shared_ptr<MemoryPool> const global_memory_pool{ std::make_shared<MemoryPoolMT>() };
 #ifndef _M_CEE
+            __attribute__ ((tls_model("global-dynamic")))
             thread_local std::shared_ptr<MemoryPool> const tls_memory_pool{ std::make_shared<MemoryPoolST>() };
 #else
 #pragma message("WARNING: Thread-local memory pools disabled to support /clr")
